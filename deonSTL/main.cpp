@@ -7,8 +7,7 @@
 //
 
 #include <iostream>
-#include "iterator.h"
-#include "uninitialized.h"
+#include "vector.h"
 
 template<class T>
 void f(const T& arg){
