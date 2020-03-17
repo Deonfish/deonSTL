@@ -9,37 +9,64 @@
 #ifndef construct_h
 #define construct_h
 
-//只是对placement new，placement delet 的简单包装
+#include <utility>  /* 引入 forward, true_type, is_trivially_destructible */
+#include "iterator.h"
 
 namespace deonSTL{
 
-//construct 构造器
+// construct 构造器
 
 template<class T>
 void construct(T* ptr){
-    new(ptr) T();
+    ::new(ptr) T();
 }
 
 template<class T>
 void construct(T* ptr, const T& value){
-    new(ptr) T(value);
+    ::new(ptr) T(value);
 }
 
-//destroy 析构
+template <class T, class... Args>   //🔥具体行为？
+void construct(T* ptr, Args&&... args){
+    ::new(ptr) T(std::forward<Args>(args)...);
+}
+
+// destroy 析构
+
+template<class T>
+void destroy_one(T* ptr, std::true_type){}
+
+template<class T>
+void destroy_one(T* ptr, std::false_type){
+    if(ptr != nullptr) ptr->~T();
+}
+
+
+template<class ForwardIter>
+void destroy_cat(ForwardIter first, ForwardIter last, std::true_type){}
+
+template<class ForwardIter>
+void destroy_cat(ForwardIter first, ForwardIter last, std::false_type){
+    for(; first != last; ++first)
+        destroy_one(&*first, false); // 与源码不同
+}
+
+
+// destroy接口
 
 template<class T>
 void destroy(T* ptr){
-    ptr->~T();
+    destroy_one(ptr, std::is_trivially_destructible<T>::value);
 }
 
-template<class T>
-void destroy(T* first, T* last){
-    for(; first != last; ++first){
-        first->~T();
-    }
+template<class ForwardIter>
+void destroy(ForwardIter first, ForwardIter last){
+    destroy_cat(first, last, std::is_trivially_destructible<
+                typename iterator_traits<ForwardIter>::value_type >::value); 
 }
 
 
-}//namespace deonSTL
+
+}// namespace deonSTL
 
 #endif /* construct_h */

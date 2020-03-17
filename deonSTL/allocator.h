@@ -18,6 +18,7 @@ namespace deonSTL {
 
 template <class T>
 class allocator{
+    
 public:
     typedef T           value_type;
     typedef T*          pointer;
@@ -29,22 +30,23 @@ public:
     
 public:
     //静态成员函数
-    static pointer allocate();
-    static pointer allocate(size_type n);
+    static T* allocate();
+    static T* allocate(size_type n);
     
-    static void deallocate(pointer ptr);
-    static void deallocate(pointer ptr, size_type n);
+    static void deallocate(T* ptr);
+    static void deallocate(T* ptr, size_type n);
     
-    static void construct(pointer ptr);
-    static void construct(pointer ptr, const T& value); //  ??
-    /*
-     static void construct(pointer ptr, T&& value);  //
-     template<class ...Args>
-     static void construct(pointer ptr, Args&& ...args);
-     */
+    static void construct(T* ptr);
+    static void construct(T* ptr, const T& value);
     
-    static void destroy(pointer ptr);
-    static void destroy(pointer first, pointer last);
+    // static void construct(pointer ptr, T&& value);   //不知作用❓，未实现
+    
+    template<class ...Args>
+    static void construct(T* ptr, Args&& ...args);
+     
+    
+    static void destroy(T* ptr);
+    static void destroy(T* first, T* last);
     
     
 };//class allocator
@@ -81,6 +83,13 @@ template<class T>
 void allocator<T>::construct(T* ptr, const T& value){
     deonSTL::construct(ptr, value);
 }
+
+template<class T>
+template<class ...Args>
+void allocator<T>::construct(T* ptr, Args&& ...args){
+    deonSTL::construct(ptr, std::forward<Args>(args)...);
+}
+
 
 template<class T>
 void allocator<T>::destroy(T* ptr){

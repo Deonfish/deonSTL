@@ -30,6 +30,9 @@
 		079CE15124112CA600733E84 /* allocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = allocator.h; sourceTree = "<group>"; };
 		079CE1542411407300733E84 /* AllocatorTest.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AllocatorTest.cpp; sourceTree = "<group>"; };
 		079CE1552411407300733E84 /* AllocatorTest.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AllocatorTest.hpp; sourceTree = "<group>"; };
+		07C0E0D9241CE3AB00BF4200 /* iterator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iterator.h; sourceTree = "<group>"; };
+		07C0E0DA241D22C700BF4200 /* type_traits.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = type_traits.h; sourceTree = "<group>"; };
+		07C0E0DB241D26D700BF4200 /* uninitialized.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = uninitialized.h; sourceTree = "<group>"; };
 		07ED85222414F8FB0030A87A /* construct.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = construct.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -65,9 +68,12 @@
 			children = (
 				079CE1522411401B00733E84 /* Test */,
 				079CE1462411148C00733E84 /* main.cpp */,
+				07C0E0D9241CE3AB00BF4200 /* iterator.h */,
 				079CE150241115E000733E84 /* vector.h */,
 				07ED85222414F8FB0030A87A /* construct.h */,
 				079CE15124112CA600733E84 /* allocator.h */,
+				07C0E0DA241D22C700BF4200 /* type_traits.h */,
+				07C0E0DB241D26D700BF4200 /* uninitialized.h */,
 			);
 			path = deonSTL;
 			sourceTree = "<group>";
