@@ -174,7 +174,7 @@ uinitialized_fill_n( ForwardIt first, Size n, const T& value)
 {
     __uinitialized_fill_n(first, n, value,
                           std::is_trivially_copy_assignable<
-                          typename iterator_traits<ForwardIt>::value_type>::value);
+                          typename iterator_traits<ForwardIt>::value_type>{});
 }
 
 // move 移动 待写 ⚠️

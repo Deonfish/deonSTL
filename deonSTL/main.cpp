@@ -9,12 +9,20 @@
 #include <iostream>
 #include "vector.h"
 
-template<class T>
-void f(const T& arg){
-    std::cout << "call\n";
-}
+
 
 int main(){
-    
+    using namespace deonSTL;
+    {
+        vector<int> vec1;
+        vector<int> vec2;
+        vec1 = vec2;
+    }
+    {
+        vector<int> vec1;
+        const vector<int> cvec1;
+        vec1 = cvec1;
+        // cvec1 = vec1;
+    }
     return 0;
 }

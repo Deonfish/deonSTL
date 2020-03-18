@@ -62,7 +62,7 @@ void destroy(T* ptr){
 template<class ForwardIter>
 void destroy(ForwardIter first, ForwardIter last){
     destroy_cat(first, last, std::is_trivially_destructible<
-                typename iterator_traits<ForwardIter>::value_type >::value); 
+                typename iterator_traits<ForwardIter>::value_type >{}); 
 }
 
 
