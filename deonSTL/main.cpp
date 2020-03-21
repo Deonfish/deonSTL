@@ -13,16 +13,10 @@
 
 int main(){
     using namespace deonSTL;
-    {
-        vector<int> vec1;
-        vector<int> vec2;
-        vec1 = vec2;
-    }
-    {
-        vector<int> vec1;
-        const vector<int> cvec1;
-        vec1 = cvec1;
-        // cvec1 = vec1;
-    }
+    int* p = allocator<int>::allocate();
+    construct(p, 100);
+    std::cout << *p << std::endl;
+    construct(p, 200);
+    std::cout << *p << std::endl;
     return 0;
 }

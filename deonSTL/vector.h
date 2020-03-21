@@ -11,8 +11,11 @@
 
 #include "allocator.h"
 #include "uninitialized.h"
+#include "exceptdef.h"
 #include <initializer_list>
-#include <algorithm>    // max
+#include <algorithm>    // max, copy_backward
+#include <memory>       // addressof
+
 
 
 namespace deonSTL {
@@ -58,19 +61,23 @@ public:
     template<class Iter>
     vector( Iter first, Iter last)
     {
-        //assert(last > first);
+        MY_DEBUG(last > first);
         range_init(first, last);
     }
     
     vector( const vector& rhs)
     { range_init(rhs.begin_, rhs.end_); }
     
-    // vector( vector&& rhs) noexcept;
+    vector( vector&& rhs) noexcept
+        :begin_(rhs.begin_), end_(rhs.end_), cap_(rhs.cap_)
+    {
+        rhs.begin_ = rhs.end_ = rhs.cap_ = nullptr;
+    }
     
     vector( std:: initializer_list<value_type> ilist)
     { range_init(ilist.begin(), ilist.end()); }
     
-    // =======================拷贝赋值函数====================== //
+    // =======================赋值函数====================== //
     vector& operator = (const vector& rhs);
     vector& operator = (vector&& rhs) noexcept;
     
@@ -106,6 +113,8 @@ public:
     { return begin_ == end_; }
     size_type           size()        const noexcept
     { return static_cast<size_type>(end_ - begin_); }
+    size_type           max_size()    const noexcept
+    { return static_cast<size_type>(-1) /sizeof(T); }
     size_type           capacity()    const noexcept
     { return static_cast<size_type>(cap_ - begin_); }
     void                reserve( size_type n);
@@ -114,15 +123,60 @@ public:
     
     reference       operator [] (size_type n)
     {
-        //assert(n < size());
+        MY_DEBUG(n < size());
         return *(begin_ + n);
     }
     const_reference operator [] (size_type n) const
     {
-        //assert(n < size());
+        MY_DEBUG(n < size());
         return *(begin_ + n);
     }
     
+    // at 检测越界的 [] 函数
+    
+    reference       font()
+    {
+        MY_DEBUG(!empty());
+        return *begin_;
+    }
+    const_reference front() const
+    {
+        MY_DEBUG(!empty());
+        return *begin_;
+    }
+    reference       back()
+    {
+        MY_DEBUG(!empty());
+        return *(end_ - 1);
+    }
+    const_reference back() const
+    {
+        MY_DEBUG(!empty());
+        return *(end_ - 1);
+    }
+    
+    // assign
+    
+    //emplace
+    template <class... Args>
+    iterator emplace(const_iterator pos, Args&& ...args);
+    
+    template <class... Args>
+    void emplace_back(Args&& ...args);
+    
+    // push_back
+    
+    void push_back(const value_type& value);
+    void push_back(value_type&& value);
+    
+    void pop_back();
+    
+    
+    
+    
+    
+    
+    void swap(vector& rhs) noexcept;
     
     
 private:
@@ -139,12 +193,19 @@ private:
     template <class Iter>
     void range_init( Iter first, Iter last) noexcept;
     
-    // 拷贝赋值函数 辅助函数
-    void swap(vector& rhs) noexcept;
-    
     // 析构函数 辅助函数
     void destroy_and_recover( iterator first, iterator last);
-};
+    
+    // 计算动态增长后的大小
+    size_type get_new_cap(size_type add_size);
+    
+    // realloc
+    template <class... Args>
+    void reallocate_emplace(iterator pos, Args&& ...args);
+    void reallocate_insert(iterator pos, const value_type& value);
+    
+
+};  // class vector
 
 //***************************************************************************//
 //                                成员函数
@@ -194,11 +255,78 @@ vector<T>::operator=(vector<T>&& rhs) noexcept
     return *this;
 }
 
+// emplace 就地(pos)构造元素，避免复制，空间不够时只扩充一个，返回插入位置
+template <class T>
+template <class... Args>
+typename vector<T>::iterator
+vector<T>::emplace(const_iterator pos, Args&& ...args)
+{
+    // 可以在 [begin, end] 的任何位置构造
+    MY_DEBUG(pos >= begin_ && pos <= end_);
+    iterator xpos = const_cast<iterator>(pos);
+    if(end_ != cap_ && xpos == end_)
+    {// 在已申请但没有构造的尾部
+        data_allocator::construct(std::addressof(*end_), std::forward<Args>(args)...);
+        ++end_;
+    }
+    else if(end_ != cap_)
+    {// 在已申请且已构造的中部(尾迭代器空间已经申请)
+        std::copy_backward(xpos, end_-1, end_);
+        *xpos = value_type(std::forward<Args>(args)...); // 不会调用 移动拷贝函数？
+        ++end_;
+    }
+    else
+    {// 在未申请未构造的尾部，申请一个空间
+        reallocate_emplace(end_, std::forward<Args>(args)...);
+        // ++end ?
+    }
+    return xpos;
+}
 
+// emplace_back 直接构造，避免复制
+template <class T>
+template <class... Args>
+void
+vector<T>::emplace_back(Args && ...args)
+{
+    if(end_ < cap_)
+    {
+        data_allocator::construct(end_, std::forward<Args>(args)...);
+        ++end_;
+    }
+    else
+        reallocate_emplace(end_, std::forward<Args>(args)...);
+}
+
+// push_back 空间不够时扩充（reallocate_insert)
+template <class T>
+void vector<T>::push_back(const value_type &value)
+{
+    if(end_ < cap_)
+    {
+        data_allocator::construct(std::addressof(*end_), value);
+        ++end_;
+    }
+    else
+        reallocate_insert(end_, value);
+}
+
+// 右值引用版本 push_back ，空间不够只扩充一个
+template <class T>
+void vector<T>::push_back(value_type &&value)
+{ emplace_back(std::move(value)); }
+
+template <class T>
+void vector<T>::pop_back()
+{
+    MY_DEBUG(!empty());
+    data_allocator::destroy(end_ - 1);
+    --end_;
+}
 
 
 //***************************************************************************//
-//                             helper function
+//                             helper functions
 //***************************************************************************//
 
 // try_init 函数，分配16个T空间，不抛出异常
@@ -262,6 +390,43 @@ vector<T>::destroy_and_recover(iterator first, iterator last)
 {
     data_allocator::destroy(first, last);
     data_allocator::deallocate(first);
+}
+
+// get_new_cap 返回动态增长以后空间的大小
+// 小空间增长得快（3/2倍），大空间增长得慢（+16）
+template <class T>
+typename vector<T>::size_type
+vector<T>::get_new_cap(size_type add_size)
+{
+    const size_type old_size = capacity();
+    // trow exception vector is too big
+    if(old_size + old_size/2 > max_size())
+        return old_size + add_size +16 > max_size() ?
+        old_size + add_size : old_size + add_size + 16;
+    const size_type new_size = old_size == 0
+    ? std::max(add_size, static_cast<size_type>(16))
+    : std::max(old_size + old_size/2, old_size + add_size);
+    return new_size;
+}
+
+// reallocate_insert 空间不够时调用，动态增长并插入
+template <class T>
+void vector<T>::reallocate_insert(iterator pos, const value_type &value)
+{
+    const size_type new_size = get_new_cap(1);
+    iterator new_begin = data_allocator::allocate(new_size);
+    iterator new_end = new_begin;
+    try {
+        new_end = uinitialized_move(begin_, pos, new_begin);
+        data_allocator::construct(pos, value);
+        ++new_end;
+    } catch (...) {
+        data_allocator::destroy(new_begin, new_end);
+    }
+    destroy_and_recover(begin_, end_);
+    begin_ = new_begin;
+    end_ = new_end;
+    cap_ = new_begin + new_size;
 }
 
 
