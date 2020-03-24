@@ -9,14 +9,19 @@
 #include <iostream>
 #include "vector.h"
 
-
+class Foo{
+public:
+    Foo(int _x = -1, int _y = -1): x(_x), y(_y) { }
+    int x, y;
+};
 
 int main(){
     using namespace deonSTL;
-    int* p = allocator<int>::allocate();
-    construct(p, 100);
-    std::cout << *p << std::endl;
-    construct(p, 200);
-    std::cout << *p << std::endl;
+    Foo* p = allocator<Foo>::allocate();
+    construct(p);
+    std::cout << p->x << " " << p->y << std::endl;
+    construct(p, 100, 100);
+    std::cout << p->x << " " << p->y << std::endl;
+    
     return 0;
 }

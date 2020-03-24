@@ -164,17 +164,51 @@ public:
     template <class... Args>
     void emplace_back(Args&& ...args);
     
-    // push_back
-    
+    // push_back, pop_back
     void push_back(const value_type& value);
     void push_back(value_type&& value);
     
     void pop_back();
     
+    // insert
+    iterator insert(const_iterator pos, const value_type& value);
+    iterator insert(const_iterator pos, value_type&& value);
+    
+    iterator insert(const_iterator pos, size_type n, const value_type& value)
+    {
+        MY_DEBUG(pos >= begin_ && pos <= end_);
+        return fill_insert(const_cast<iterator>(pos), n, value);
+    }
+    
+    template <class Iter>
+    iterator insert(const_iterator pos, Iter first, Iter second)
+    {
+        MY_DEBUG(pos >= begin_ && pos <= end_);
+        return copy_insert(const_cast<iterator>(pos), first, second);
+    }
+    
+    // erase , clear
+    
+    iterator erase(const_iterator pos);
+    iterator erase(const_iterator first, const_iterator last);
+    
+    void clear()
+    { erase(begin_, end_); }
+    
+    
+    // resize , reverse
+    void resize(size_type new_size)
+    { return resize(new_size, value_type()); }
+    void resize(size_type new_size, const value_type& value);
+    
+    void reverse()
+    { std::reverse(begin(), end()); }
     
     
     
     
+    
+    // swap
     
     void swap(vector& rhs) noexcept;
     
@@ -204,6 +238,12 @@ private:
     void reallocate_emplace(iterator pos, Args&& ...args);
     void reallocate_insert(iterator pos, const value_type& value);
     
+    // fill_insert
+    iterator fill_insert(iterator pos, size_type n, const value_type& value);
+    
+    // copy_insert
+    template <class Iter>
+    iterator copy_insert(iterator pos, Iter first, Iter second);
 
 };  // class vector
 
@@ -270,7 +310,8 @@ vector<T>::emplace(const_iterator pos, Args&& ...args)
         ++end_;
     }
     else if(end_ != cap_)
-    {// 在已申请且已构造的中部(尾迭代器空间已经申请)
+    {// 在已申请且已构造的中部(尾迭代器空间已经申请) , 与源码不一致！⚠️
+        data_allocator::construct(std::addressof(*end_), *(end_ - 1));
         std::copy_backward(xpos, end_-1, end_);
         *xpos = value_type(std::forward<Args>(args)...); // 不会调用 移动拷贝函数？
         ++end_;
@@ -322,6 +363,74 @@ void vector<T>::pop_back()
     MY_DEBUG(!empty());
     data_allocator::destroy(end_ - 1);
     --end_;
+}
+
+template <class T>
+typename vector<T>::iterator
+vector<T>::insert(const_iterator pos, const value_type &value)
+{
+    MY_DEBUG(pos >= begin_ && pos <= end_);
+    iterator xpos = const_cast<iterator>(pos);
+    if(end_ != cap_ && xpos == end_)
+    {
+        data_allocator::construct(std::addressof(*end_), value);
+        ++end_;
+    }
+    else if(end_ != cap_)
+    {
+        data_allocator::construct(std::addressof(*end_), *(end_ - 1));
+        std::copy_backward(xpos, end_-1, end_);
+        *xpos = value_type(value);
+        ++end_;
+    }
+    else
+    {
+        reallocate_insert(xpos, value);
+    }
+    return xpos;
+}
+
+template <class T>
+typename vector<T>::iterator
+vector<T>::insert(const_iterator pos, value_type &&value)
+{ return emplace(pos, std::move(value)); }
+
+template <class T>
+typename vector<T>::iterator
+vector<T>::erase(const_iterator pos)
+{
+    MY_DEBUG(pos >= begin_ && pos < end_);
+    iterator xpos = const_cast<iterator>(pos);
+    std::move(xpos+1, end_, xpos);
+    data_allocator::destroy(&*(end_ - 1)); // 源码 destroy(end_ - 1) ❓
+    --end_;
+    return xpos;
+}
+
+// 与源码不一致
+template <class T>
+typename vector<T>::iterator
+vector<T>::erase(const_iterator first, const_iterator last)
+{
+    MY_DENUG(first >= begin_ && last <= end_ && (last >= first));
+    iterator xfirst = const_cast<iterator>(first), xlast = const_cast<iterator>(last);
+    data_allocator::destroy(std::move(xlast, end_, xfirst), end_);
+    end_ = end_ - (last - first);
+    return xfirst;
+}
+
+
+template <class T>
+void vector<T>::resize(size_type new_size, const value_type &value)
+{
+    if(new_size < size())
+    {
+        erase(begin() + new_size, end());
+    }
+    else
+    {
+        insert(end(), new_size - size(), value);
+    }
 }
 
 
@@ -429,6 +538,42 @@ void vector<T>::reallocate_insert(iterator pos, const value_type &value)
     cap_ = new_begin + new_size;
 }
 
+template <class T>
+typename vector<T>::iterator
+vector<T>::fill_insert(iterator pos, size_type n, const value_type &value)
+{
+    if(n == 0) return pos;
+    const size_type after_elems = end_ - pos;
+    if(cap_ - end_ >= n)
+    {
+        const size_type after_elems = end_ - pos;
+        if(after_elems > n)
+        {
+            deonSTL::uinitialized_copy(end_ - n, end_, end_);
+            std::move_backward(pos, end_ - n, end_ - n);
+            deonSTL::uinitialized_fill_n(pos, after_elems, value);
+            end_ += n;
+        }
+        else
+        {
+            deonSTL::uinitialized_copy(pos, end_, pos + n);
+            deonSTL::uinitialized_fill_n(pos, after_elems, value);
+            end_ += n;
+        }
+    }
+    else
+    {
+        
+    }
+}
+
+template <class T>
+template <class Iter>
+typename vector<T>::iterator
+vector<T>::copy_insert(iterator pos, Iter first, Iter second)
+{
+    
+}
 
 } // namespace deonSTL
 
