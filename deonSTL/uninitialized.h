@@ -15,10 +15,11 @@
 
 namespace deonSTL{
 
-//*****************************************************************************************************//
-// uinitialized_copy
-// 把 [first, last) 上的内容复制到 result 为起始的空间，返回结束位置
-//*****************************************************************************************************//
+
+//*****************************************************************************************//
+//                                 uinitialized_copy                                       //
+//               把 [first, last) 上的内容复制到 result 为起始的空间，返回结束位置                 //
+//*****************************************************************************************//
 
 // 对于 has trivial 特化版本
 template <class InputIt, class ForwardIt>
@@ -54,13 +55,13 @@ uinitialized_copy(InputIt first, InputIt last, ForwardIt result)
 {
     return __uinitialized_copy(first, last, result,
                                std::is_trivially_copy_assignable<   //拷贝赋值？
-                               typename iterator_traits<ForwardIt>::value_type>::value);
+                               typename iterator_traits<ForwardIt>::value_type>{});
 }
 
-//*****************************************************************************************************//
-// uinitialized_copy_n
-// 把 [first, first+n) 上的内容复制到 result 为起始的空间，返回结束位置
-//*****************************************************************************************************//
+//*****************************************************************************************//
+//                               uinitialized_copy_n                                       //
+//            把 [first, first+n ) 上的内容复制到 result 为起始的空间，返回结束位置                //
+//*****************************************************************************************//
 
 // 对于 has trivial 特化版本
 template <class InputIt, class Size, class ForwardIt>
@@ -94,13 +95,13 @@ uninitialized_copy_n(InputIt first, Size n, ForwardIt result)
 {
     return __uninitialized_copy_n(first, n, result,
                                   std::is_trivially_copy_assignable<
-                                  typename iterator_traits<ForwardIt>::value_type>::value);
+                                  typename iterator_traits<ForwardIt>::value_type>{});
 }
 
-//*****************************************************************************************************//
-// uinitialized_fill
-// 在 [first, last) 区间赋值 value，不返回值
-//*****************************************************************************************************//
+//*****************************************************************************************//
+//                                  uinitialized_fill                                      //
+//                         在 [first, last) 区间赋值 value，不返回值                           //
+//*****************************************************************************************//
 
 // 对于 has trivial 特化版本
 template <class ForwardIt, class T>
@@ -134,13 +135,13 @@ uninitialized_fill( ForwardIt first, ForwardIt last, const T& value)
 {
     __uninitialized_fill(first, last, value,
                          std::is_trivially_copy_assignable<
-                         typename iterator_traits<ForwardIt>::value_type>::value);
+                         typename iterator_traits<ForwardIt>::value_type>{});
 }
 
-//*****************************************************************************************************//
-// uinitialized_fill_n
-// 在 [first, first+n) 区间赋值 value，不返回值
-//*****************************************************************************************************//
+//*****************************************************************************************//
+//                                  uinitialized_fill_n                                    //
+//                         在 [first, first+n) 区间赋值 value，不返回值                        //
+//*****************************************************************************************//
 
 // 对于 has trivial 特化版本
 template <class ForwardIt, class Size, class T>
@@ -177,7 +178,92 @@ uinitialized_fill_n( ForwardIt first, Size n, const T& value)
                           typename iterator_traits<ForwardIt>::value_type>{});
 }
 
-// move 移动 待写 ⚠️
+//*****************************************************************************************//
+//                                  uinitialized_move                                      //
+//                      把[first, last) 的内容移动到 result开始处，窃取空间                      //
+//*****************************************************************************************//
+
+// 对于 has trivial 特化版本
+template <class InputIter, class ForwardIter>
+ForwardIter
+__uinitialized_move(InputIter first, InputIter last, ForwardIter result, std::true_type)
+{
+    return std::move(first, last, result);
+}
+
+// 对于 has non_trivial 特化版本
+template <class InputIter, class ForwardIter>
+ForwardIter
+__uinitialized_move(InputIter first, InputIter last, ForwardIter result, std::false_type)
+{
+    ForwardIter cur = result;
+    try
+    {
+        for(; first != last; ++first, ++cur)
+            deonSTL::construct(&*cur, std::move(*first));
+    }
+    catch(...)
+    {
+        deonSTL::destroy(result, cur);
+    }
+    return cur;
+}
+
+// uinitialized_fill_n 实作
+template <class InputIter, class ForwardIter>
+ForwardIter
+uinitialized_move(InputIter first, InputIter last, ForwardIter result)
+{
+    return deonSTL::__uinitialized_move(first, last, result,
+                                        std::is_trivially_move_assignable<
+                                        typename iterator_traits<InputIter>::value_type>{});
+}
+
+//*****************************************************************************************//
+//                                 uinitialized_move_n                                     //
+//                     把[first, first+n) 的内容移动到 result开始处，窃取空间                    //
+//*****************************************************************************************//
+
+// 对于 has trivial 特化版本
+template <class InputIter, class Size, class ForwardIter>
+ForwardIter
+__uinitialized_move_n(InputIter first, Size n, ForwardIter result, std::true_type)
+{
+    return std::move(first, first + n, result);
+}
+
+// 对于 has non_trivial 特化版本
+template <class InputIter, class Size, class ForwardIter>
+ForwardIter
+__uinitialized_move_n(InputIter first, Size n, ForwardIter result, std::false_type)
+{
+    auto cur = result;
+    try
+    {
+        for(; n > 0; --n, ++first, ++cur)
+            deonSTL::construct(&*cur, std::move(*first));
+    }
+    catch(...)
+    {
+        for(; result != cur; ++result)
+            deonSTL::destroy(&*result);
+        throw ;
+    }
+    return cur;
+}
+
+// uinitialized_fill_n 实作
+template <class InputIter, class Size, class ForwardIter>
+ForwardIter
+uinitialized_move_n(InputIter first, Size n, ForwardIter result)
+{
+    return deonSTL::__uinitialized_move_n(first, n, result,
+                                          std::is_trivially_move_assignable<
+                                          typename iterator_traits<InputIter>::value_type>{});
+}
+
+
+
 
 }// namespace deonSTL
 
