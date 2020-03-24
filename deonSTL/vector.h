@@ -13,7 +13,7 @@
 #include "uninitialized.h"
 #include "exceptdef.h"
 #include <initializer_list>
-#include <algorithm>    // max, copy_backward
+#include <algorithm>    // max, copy_backward, equal, fill
 #include <memory>       // addressof
 
 
@@ -545,24 +545,29 @@ vector<T>::fill_insert(iterator pos, size_type n, const value_type &value)
     if(n == 0) return pos;
     const size_type after_elems = end_ - pos;
     if(cap_ - end_ >= n)
-    {
+    {// 不需要扩充空间
         const size_type after_elems = end_ - pos;
         if(after_elems > n)
-        {
+        {// 旧的部分一部分构造，一部分移动，新的部分全部赋值
             deonSTL::uinitialized_copy(end_ - n, end_, end_);
             std::move_backward(pos, end_ - n, end_ - n);
-            deonSTL::uinitialized_fill_n(pos, after_elems, value);
+            std::fill(pos, after_elems, value);
             end_ += n;
         }
         else
-        {
+        {// 旧的部分全部构造，新的部分一部分赋值，一部分构造
             deonSTL::uinitialized_copy(pos, end_, pos + n);
-            deonSTL::uinitialized_fill_n(pos, after_elems, value);
+            deonSTL::uinitialized_fill_n(end_, n - after_elems, value);
+            std::fill(pos, end_, value);
             end_ += n;
         }
     }
     else
-    {
+    {// 需要扩充空间
+        const size_type new_size = get_new_cap(n);
+        auto new_begin = data_allocator::allocate(new_size);
+        auto new_end = new_begin;
+        
         
     }
 }
@@ -574,6 +579,30 @@ vector<T>::copy_insert(iterator pos, Iter first, Iter second)
 {
     
 }
+
+//***************************************************************************//
+//                             重载比较操作符
+//***************************************************************************//
+
+template <class T>
+bool operator == (const vector<T>& lhs, const vector<T>& rhs)
+{
+    return lhs.size() == rhs.size() &&
+    std::equal(lhs.begin(), lhs.end(), rhs.begin());
+}
+
+template <class T>
+bool operator != (const vector<T>& lhs, const vector<T>& rhs)
+{
+    return !(lhs == rhs);
+}
+
+template <class T>
+void swap(vector<T>& lhs, vector<T>& rhs)
+{
+    lhs.swap(rhs);
+}
+
 
 } // namespace deonSTL
 

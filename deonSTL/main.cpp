@@ -14,14 +14,12 @@ public:
     Foo(int _x = -1, int _y = -1): x(_x), y(_y) { }
     int x, y;
 };
-
+void fuc(int& i)
+{
+    
+}
 int main(){
     using namespace deonSTL;
-    Foo* p = allocator<Foo>::allocate();
-    construct(p);
-    std::cout << p->x << " " << p->y << std::endl;
-    construct(p, 100, 100);
-    std::cout << p->x << " " << p->y << std::endl;
-    
+    const int x = 2;
     return 0;
 }
