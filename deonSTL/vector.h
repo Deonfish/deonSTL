@@ -48,7 +48,6 @@ private:
     
 public:
     
-    // =======================构造函数======================= //
     vector() noexcept
     { try_init(); }
 
@@ -77,7 +76,6 @@ public:
     vector( std:: initializer_list<value_type> ilist)
     { range_init(ilist.begin(), ilist.end()); }
     
-    // =======================赋值函数====================== //
     vector& operator = (const vector& rhs);
     vector& operator = (vector&& rhs) noexcept;
     
@@ -88,7 +86,6 @@ public:
         return *this;
     }
     
-    // =======================析构函数====================== //
     ~vector( )
     {
         destroy_and_recover(begin_, end_);
@@ -108,6 +105,7 @@ public:
     const_iterator      end()         const noexcept
     { return end_; }
     
+    // rbegin,rend...
     
     bool                empty()       const noexcept
     { return begin_ == end_; }
@@ -117,7 +115,7 @@ public:
     { return static_cast<size_type>(-1) /sizeof(T); }
     size_type           capacity()    const noexcept
     { return static_cast<size_type>(cap_ - begin_); }
-    void                reserve( size_type n);
+    void                reserve( size_type n); // <- 待实现 ⚠️
     void                shrink_to_fit();
     
     
@@ -155,7 +153,7 @@ public:
         return *(end_ - 1);
     }
     
-    // assign
+    // assign <- 待实现 ⚠️
     
     //emplace
     template <class... Args>
@@ -196,17 +194,14 @@ public:
     { erase(begin_, end_); }
     
     
-    // resize , reverse
+    // resize
     void resize(size_type new_size)
     { return resize(new_size, value_type()); }
     void resize(size_type new_size, const value_type& value);
     
+    // reverse
     void reverse()
     { std::reverse(begin(), end()); }
-    
-    
-    
-    
     
     // swap
     
@@ -233,17 +228,20 @@ private:
     // 计算动态增长后的大小
     size_type get_new_cap(size_type add_size);
     
+    // assign <- 待实现 ⚠️
     // realloc
     template <class... Args>
     void reallocate_emplace(iterator pos, Args&& ...args);
     void reallocate_insert(iterator pos, const value_type& value);
     
-    // fill_insert
+    // insert
     iterator fill_insert(iterator pos, size_type n, const value_type& value);
     
-    // copy_insert
     template <class Iter>
-    iterator copy_insert(iterator pos, Iter first, Iter second);
+    void copy_insert(iterator pos, Iter first, Iter last);
+    
+    //shrink_to_fit <- 待实现 ⚠️
+    
 
 };  // class vector
 
@@ -254,27 +252,26 @@ private:
 // 复制赋值操作符
 template <class T>
 vector<T>&
-vector<T>::operator = ( const vector& rhs)
+vector<T>::operator=( const vector& rhs)
 {
     if(this != &rhs)
     {
-        const auto len = rhs.size();
-        if( len > cap_)
+        const size_type len = rhs.size();
+        if(len > capacity())
         {
-            vector tmp(rhs.begin_, rhs.end_);
+            vector tmp(rhs.begin(), rhs.end());
             swap(tmp);
         }
-        else if( len > size())
+        else if(size() >= len)
         {
-            // copy ❓
-            std::copy(rhs.begin_, rhs.begin_ + size(), begin_);
-            uinitialized_copy(rhs.begin_ + size(), rhs.end_,end_);
-            cap_ = end_ = begin_ + len;
+            auto i = std::copy(rhs.begin(), rhs.end(), begin());
+            data_allocator::destroy(i, end_);
+            end_ = begin_ + len;
         }
         else
         {
-            auto i = uinitialized_copy(rhs.begin_, rhs.end_, begin_);
-            data_allocator::destroy(i, end_);
+            std::copy(rhs.begin(), rhs.begin() + size(), begin());
+            deonSTL::uinitialized_copy(rhs.begin() + size(), rhs.end(), end_);
             end_ = begin_ + len;
         }
     }
@@ -492,7 +489,8 @@ vector<T>::range_init(Iter first, Iter last) noexcept
     uinitialized_copy(first, last, begin_);
 }
 
-// destroy_and_recover 函数，析构 [first,last) 的内容，释放全部申请的空间
+// destroy_and_recover 函数
+// 析构 [first,last) 的内容，释放全部申请的空间(只能选择释放全部）
 template <class T>
 void
 vector<T>::destroy_and_recover(iterator first, iterator last)
@@ -543,6 +541,7 @@ typename vector<T>::iterator
 vector<T>::fill_insert(iterator pos, size_type n, const value_type &value)
 {
     if(n == 0) return pos;
+    const size_type xpos = pos - begin_;    // 用于返回值
     const size_type after_elems = end_ - pos;
     if(cap_ - end_ >= n)
     {// 不需要扩充空间
@@ -551,14 +550,13 @@ vector<T>::fill_insert(iterator pos, size_type n, const value_type &value)
         {// 旧的部分一部分构造，一部分移动，新的部分全部赋值
             deonSTL::uinitialized_copy(end_ - n, end_, end_);
             std::move_backward(pos, end_ - n, end_ - n);
-            std::fill(pos, after_elems, value);
+            deonSTL::uinitialized_fill_n(pos, n, value);
             end_ += n;
         }
         else
         {// 旧的部分全部构造，新的部分一部分赋值，一部分构造
-            deonSTL::uinitialized_copy(pos, end_, pos + n);
-            deonSTL::uinitialized_fill_n(end_, n - after_elems, value);
-            std::fill(pos, end_, value);
+            uinitialized_move(pos, end_, pos + n);
+            deonSTL::uinitialized_fill_n(pos, n, value);
             end_ += n;
         }
     }
@@ -567,17 +565,70 @@ vector<T>::fill_insert(iterator pos, size_type n, const value_type &value)
         const size_type new_size = get_new_cap(n);
         auto new_begin = data_allocator::allocate(new_size);
         auto new_end = new_begin;
-        
-        
+        try {
+            new_end = uinitialized_move(begin_, pos, new_begin);
+            new_end = deonSTL::uinitialized_fill_n(new_end, n, value);
+            new_end = uinitialized_move(pos, end_, new_end);
+        } catch (...) {
+            destroy_and_recover(new_begin, new_end);
+            throw;
+        }
+        data_allocator::deallocate(begin_);
+        begin_ = new_begin;
+        end_ = new_end;
+        cap_ = begin_ + new_size;
     }
+    return begin_ + xpos;
 }
 
 template <class T>
 template <class Iter>
-typename vector<T>::iterator
-vector<T>::copy_insert(iterator pos, Iter first, Iter second)
+void
+vector<T>::copy_insert(iterator pos, Iter first, Iter last)
 {
-    
+    if (first == last)
+      return;
+    const auto n = deonSTL::distance(first, last);
+    if ((cap_ - end_) >= n)
+    { // 如果备用空间大小足够
+      const auto after_elems = end_ - pos;
+      auto old_end = end_;
+      if (after_elems > n)
+      {
+        end_ = deonSTL::uninitialized_copy(end_ - n, end_, end_);
+        deonSTL::move_backward(pos, old_end - n, old_end);
+        deonSTL::uninitialized_copy(first, last, pos);
+      }
+      else
+      {
+        auto mid = first;
+        deonSTL::advance(mid, after_elems);
+        end_ = deonSTL::uninitialized_copy(mid, last, end_);
+        end_ = deonSTL::uninitialized_move(pos, old_end, end_);
+        deonSTL::uninitialized_copy(first, mid, pos);
+      }
+    }
+    else
+    { // 备用空间不足
+      const auto new_size = get_new_cap(n);
+      auto new_begin = data_allocator::allocate(new_size);
+      auto new_end = new_begin;
+      try
+      {
+        new_end = deonSTL::uninitialized_move(begin_, pos, new_begin);
+        new_end = deonSTL::uninitialized_copy(first, last, new_end);
+        new_end = deonSTL::uninitialized_move(pos, end_, new_end);
+      }
+      catch (...)
+      {
+        destroy_and_recover(new_begin, new_end, new_size);
+        throw;
+      }
+      data_allocator::deallocate(begin_, cap_ - begin_);
+      begin_ = new_begin;
+      end_ = new_end;
+      cap_ = begin_ + new_size;
+    }
 }
 
 //***************************************************************************//
