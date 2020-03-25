@@ -19,10 +19,11 @@ struct bidirectional_iterator_tag : public forward_iterator_tag {};
 struct random_access_iterator_tag : public bidirectional_iterator_tag {};
 
 
-/* ********************* */
-/*  iteratorm 模板        */
-/*  所有迭代器应该继承此类   */
-/* ********************* */
+//***************************************************************************//
+//                            iteratorm 模板                                  //
+//                          所有迭代器应该继承此类                               //
+//***************************************************************************//
+
 template <class Category, class T, class Distance = ptrdiff_t,
 class Pointer = T*, class Reference = T&>
 struct iterator
@@ -35,9 +36,10 @@ struct iterator
 };
 
 
-/* *********************
- *  iterator traits    *
- ********************* */
+//***************************************************************************//
+//                            iterator traits                                //
+//***************************************************************************//
+
 template <class Iterator>
 struct iterator_traits
 {
@@ -83,6 +85,10 @@ iterator_category(const Iterator&){
 
 */
 
+//***************************************************************************//
+//                                distance                                   //
+//***************************************************************************//
+
 // distance 的 InputIterator 特化版本
 template <class InputIterator>
 typename iterator_traits<InputIterator>::difference_type
@@ -110,6 +116,9 @@ distance(Iterator first, Iterator last)
     return __distance(first, last, category());
 }
 
+//***************************************************************************//
+//                                advance                                    //
+//***************************************************************************//
 
 // advance 的 InputIterator 特化版本
 template <class InputIterator, class Distance>
