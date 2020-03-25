@@ -7,7 +7,7 @@
 //
 
 #include <iostream>
-#include "vector.h"
+#include "deque.h"
 
 class Foo{
 public:
