@@ -130,7 +130,7 @@ public:
         return *(begin_ + n);
     }
     
-    // at 检测越界的 [] 函数
+    // at 检测越界的 [] 函数（未实现）
     
     reference       font()
     {
@@ -153,7 +153,7 @@ public:
         return *(end_ - 1);
     }
     
-    // assign <- 待实现 ⚠️
+    // assign（未实现）
     
     //emplace
     template <class... Args>
@@ -228,7 +228,8 @@ private:
     // 计算动态增长后的大小
     size_type get_new_cap(size_type add_size);
     
-    // assign <- 待实现 ⚠️
+    // assign（未实现）
+    
     // realloc
     template <class... Args>
     void reallocate_emplace(iterator pos, Args&& ...args);
@@ -240,13 +241,13 @@ private:
     template <class Iter>
     void copy_insert(iterator pos, Iter first, Iter last);
     
-    //shrink_to_fit <- 待实现 ⚠️
-    
 
 };  // class vector
 
+
+
 //***************************************************************************//
-//                                成员函数
+//                           member functions                                //
 //***************************************************************************//
 
 // 复制赋值操作符
@@ -291,6 +292,40 @@ vector<T>::operator=(vector<T>&& rhs) noexcept
     rhs.begin_ = rhs.end_ = rhs.cap_ = nullptr;
     return *this;
 }
+
+template <class T>
+void vector<T>::reserve(size_type n)
+{
+    if(capacity() < n)
+    {
+        const size_type old_size = size();
+        auto new_begin = data_allocator::allocate(n);
+        deonSTL::uninitialized_move(begin_, end_, new_begin);
+        data_allocator::deallocate(begin_);
+        begin_ = new_begin;
+        end_ = new_begin + old_size;
+        cap_ = begin_ + n;
+    }
+}
+
+template <class T>
+void vector<T>::shrink_to_fit()
+{
+    size_type size = size();
+    auto new_begin = data_allocator::allocate(size);
+    try {
+        deonSTL::uninitialized_move(begin_, end_, new_begin);
+    } catch (...) {
+        data_allocator::deallocate(new_begin);
+        throw;
+    }
+    data_allocator::deallocate(begin_);
+    begin_ = new_begin;
+    end_ = begin_ + size;
+    cap_ = begin_ + size;
+}
+
+
 
 // emplace 就地(pos)构造元素，避免复制，空间不够时只扩充一个，返回插入位置
 template <class T>
@@ -432,7 +467,7 @@ void vector<T>::resize(size_type new_size, const value_type &value)
 
 
 //***************************************************************************//
-//                             helper functions
+//                             helper functions                              //
 //***************************************************************************//
 
 // try_init 函数，分配16个T空间，不抛出异常
@@ -632,7 +667,7 @@ vector<T>::copy_insert(iterator pos, Iter first, Iter last)
 }
 
 //***************************************************************************//
-//                             重载比较操作符
+//                            equal operator                                 //
 //***************************************************************************//
 
 template <class T>
