@@ -271,7 +271,7 @@ vector<T>::operator=( const vector& rhs)
         else
         {
             std::copy(rhs.begin(), rhs.begin() + size(), begin());
-            deonSTL::uinitialized_copy(rhs.begin() + size(), rhs.end(), end_);
+            deonSTL::uninitialized_copy(rhs.begin() + size(), rhs.end(), end_);
             end_ = begin_ + len;
         }
     }
@@ -474,7 +474,7 @@ vector<T>::fill_init(size_type n, const value_type& value) noexcept
 {
     const size_type init_size = std::max(static_cast<size_type>(16), n);    // max 待写 ⚠️
     init_space(n, init_size);
-    uinitialized_fill_n(begin_, n, value);
+    uninitialized_fill_n(begin_, n, value);
 }
 
 // range_init 函数，通过拷贝[first,last)内容初始化，不抛出异常
@@ -486,7 +486,7 @@ vector<T>::range_init(Iter first, Iter last) noexcept
     const size_type init_space = std::max( static_cast<size_type>(last - first),
                                           static_cast<size_type>(16));
     init_space( static_cast<size_type>(last - first), init_space);
-    uinitialized_copy(first, last, begin_);
+    uninitialized_copy(first, last, begin_);
 }
 
 // destroy_and_recover 函数
@@ -524,7 +524,7 @@ void vector<T>::reallocate_insert(iterator pos, const value_type &value)
     iterator new_begin = data_allocator::allocate(new_size);
     iterator new_end = new_begin;
     try {
-        new_end = uinitialized_move(begin_, pos, new_begin);
+        new_end = uninitialized_move(begin_, pos, new_begin);
         data_allocator::construct(pos, value);
         ++new_end;
     } catch (...) {
@@ -548,15 +548,15 @@ vector<T>::fill_insert(iterator pos, size_type n, const value_type &value)
         const size_type after_elems = end_ - pos;
         if(after_elems > n)
         {// 旧的部分一部分构造，一部分移动，新的部分全部赋值
-            deonSTL::uinitialized_copy(end_ - n, end_, end_);
+            deonSTL::uninitialized_copy(end_ - n, end_, end_);
             std::move_backward(pos, end_ - n, end_ - n);
-            deonSTL::uinitialized_fill_n(pos, n, value);
+            deonSTL::uninitialized_fill_n(pos, n, value);
             end_ += n;
         }
         else
         {// 旧的部分全部构造，新的部分一部分赋值，一部分构造
-            uinitialized_move(pos, end_, pos + n);
-            deonSTL::uinitialized_fill_n(pos, n, value);
+            deonSTL::uninitialized_move(pos, end_, pos + n);
+            deonSTL::uninitialized_fill_n(pos, n, value);
             end_ += n;
         }
     }
@@ -566,9 +566,9 @@ vector<T>::fill_insert(iterator pos, size_type n, const value_type &value)
         auto new_begin = data_allocator::allocate(new_size);
         auto new_end = new_begin;
         try {
-            new_end = uinitialized_move(begin_, pos, new_begin);
-            new_end = deonSTL::uinitialized_fill_n(new_end, n, value);
-            new_end = uinitialized_move(pos, end_, new_end);
+            new_end = deonSTL::uninitialized_move(begin_, pos, new_begin);
+            new_end = deonSTL::uninitialized_fill_n(new_end, n, value);
+            new_end = deonSTL::uninitialized_move(pos, end_, new_end);
         } catch (...) {
             destroy_and_recover(new_begin, new_end);
             throw;
@@ -596,7 +596,7 @@ vector<T>::copy_insert(iterator pos, Iter first, Iter last)
       if (after_elems > n)
       {
         end_ = deonSTL::uninitialized_copy(end_ - n, end_, end_);
-        deonSTL::move_backward(pos, old_end - n, old_end);
+        std::move_backward(pos, old_end - n, old_end);
         deonSTL::uninitialized_copy(first, last, pos);
       }
       else
