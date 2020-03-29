@@ -64,6 +64,11 @@ public:
         range_init(first, last);
     }
     
+    vector( std:: initializer_list<value_type> ilist)
+    {
+        range_init(ilist.begin(), ilist.end());
+    }
+    
     vector( const vector& rhs)
     { range_init(rhs.begin_, rhs.end_); }
     
@@ -73,8 +78,6 @@ public:
         rhs.begin_ = rhs.end_ = rhs.cap_ = nullptr;
     }
     
-    vector( std:: initializer_list<value_type> ilist)
-    { range_init(ilist.begin(), ilist.end()); }
     
     vector& operator = (const vector& rhs);
     vector& operator = (vector&& rhs) noexcept;
@@ -115,7 +118,7 @@ public:
     { return static_cast<size_type>(-1) /sizeof(T); }
     size_type           capacity()    const noexcept
     { return static_cast<size_type>(cap_ - begin_); }
-    void                reserve( size_type n); // <- 待实现 ⚠️
+    void                reserve( size_type n);
     void                shrink_to_fit();
     
     

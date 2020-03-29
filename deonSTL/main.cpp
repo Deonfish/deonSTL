@@ -7,19 +7,26 @@
 //
 
 #include <iostream>
-#include "deque.h"
+#include <vector>
+#include <typeinfo>
+#include "allocator.h"
+
 
 class Foo{
 public:
     Foo(int _x = -1, int _y = -1): x(_x), y(_y) { }
     int x, y;
 };
-void fuc(int& i)
+
+template <class T>
+void f(const T& param)
 {
-    
+    std::cout << typeid(param).name() << std::endl;
 }
+
 int main(){
-    using namespace deonSTL;
-    const int x = 2;
+    using namespace std;
+    int x{};
+    cout << x << endl;
     return 0;
 }
