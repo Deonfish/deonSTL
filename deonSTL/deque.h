@@ -44,7 +44,7 @@ struct deque_iterator : public iterator<random_access_iterator_tag, T>
     // 成员数据
     value_pointer   cur;        // 指向所在缓冲区当前元素
     value_pointer   first;      // 指向所在缓冲区头部
-    value_pointer   last;       // 指向所在缓冲区尾部
+    value_pointer   last;       // 指向所在缓冲区尾后
     map_pointer     node;       // 缓冲区所在节点
     
     // ======================构造、移动、赋值函数====================== //
@@ -315,14 +315,28 @@ public:
     template <class ...Args>
     iterator    emplace(iterator pos, Args&& ...args);
     
-    // push_front, push_back
-    // pop_front, pop_back
+    // push_front, push_back， pop_front, pop_back
+    void        push_front(const value_type& value);
+    void        push_back (const value_type& value);
+    
+    void        push_front(value_type&& value) { emplace_front(std::move(value)); }
+    void        push_back (value_type&& value) { emplace_back(std::move(value));  }
+    
+    void        pop_front();
+    void        pop_back();
+    
     
     // insert
+    iterator    insert(iterator pos, const value_type& value);
+    iterator    insert(iterator pos, value_type&& value);
+    void        insert(iterator pos, size_type n, const value_type& value);
+    template <class IIter>
+    void        insert(iterator position, IIter first, IIter last);
     
     // erase
     
     // clear
+    void clear();
     
     // swap
     void swap(deque& rhs) noexcept;
@@ -346,6 +360,15 @@ private:
     template <class FIter>
     void        copy_init(FIter first, FIter last, forward_iterator_tag);
     
+    void        reallocate_map_at_front(size_type need_buffer);
+    void        reallocate_map_at_back (size_type need_buffer);
+    
+    void        require_capacity(size_type n, bool front);
+    
+    template <class ...Args>
+    iterator    insert_aux(iterator pos, Args&& ...args);
+    
+    void        fill_insert(iterator pos, size_type n, const value_type& value);
     
     
     
@@ -373,15 +396,36 @@ template <class ...Args>
 void
 deque<T>::emplace_front(Args&& ...args)
 {
-    
+    if(begin_.cur != begin_.first)
+    {
+        data_allocator::construct(begin_.cur - 1, std::forward<Args>(args)...);
+        --begin_.cur;
+    }
+    else
+    {
+        require_capacity(1, true);
+        --begin_;
+        data_allocator::construct(begin_.cur, std::forward<Args>(args)...);
+    }
 }
 
+// 与源码不一致
 template <class T>
 template <class ...Args>
 void
 deque<T>::emplace_back(Args&& ...args)
 {
-    
+    if(end_.cur != end_.last - 1)
+    {// 注意还剩一个元素的空间就要开始申请，因为若不申请就占用最后一个空间，end_指针会指向一个未声明空间
+        data_allocator::construct(end_.cur, std::forward<Args>(args)...);
+        ++end_.cur;
+    }
+    else
+    {
+        require_capacity(1, false);
+        data_allocator::construct(end_.cur, std::forward<Args>(args)...);
+        ++end_;
+    }
 }
 
 template <class T>
@@ -389,13 +433,88 @@ template <class ...Args>
 typename deque<T>::iterator
 deque<T>::emplace(iterator pos, Args&& ...args)
 {
-    
+    if(pos.cur == begin_.cur)
+    {
+        emplace_front(std::forward<Args>(args)...);
+        return begin_;
+    }
+    else if(pos.cur == end_.cur)
+    {
+        emplace_back(std::forward<Args>(args)...);
+        return end_; // 返回尾后迭代器？
+    }
+    return insert_aux(pos, std::forward<Args>(args)...);
 }
+
+template <class T>
+typename deque<T>::iterator
+deque<T>::insert(iterator pos, const value_type &value)
+{
+    if(pos.cur == begin_.cur)
+    {
+        push_front(value);
+        return begin_;
+    }
+    else if(pos.cur == end_.cur)
+    {
+        push_back(value);
+        auto tmp = end_;
+        --tmp;
+        return tmp;
+    }
+    else
+        return insert_aux(pos, value);
+}
+
+template <class T>
+typename deque<T>::iterator
+deque<T>::insert(iterator pos, value_type &&value)
+{
+    if(pos.cur == begin_.cur)
+    {
+        emplace_front(std::move(value));
+        return begin_;
+    }
+    else if(pos.cur == end_.cur)
+    {
+        emplace_back(std::move(value));
+        auto tmp = end_;
+        --tmp;
+        return tmp;
+    }
+    else
+        return insert_aux(pos, std::move(value));
+}
+
+template <class T>
+void
+deque<T>::insert(iterator pos, size_type n, const value_type &value)
+{
+    if(pos.cur == begin_.cur)
+    {
+        require_capacity(n, true);
+        auto new_begin = begin_ - n;
+        deonSTL::uninitialized_fill_n(new_begin, n, value);
+        begin_ = new_begin;
+    }
+    else if(pos.cur == end_.cur)
+    {
+        require_capacity(n, false);
+        auto new_end = end_ + n;
+        deonSTL::uninitialized_fill_n(end_, n, value);
+        end_ = new_end;
+    }
+    else
+        fill_insert(pos, n, value);
+}
+
+
 
 //***************************************************************************//
 //                             helper functions                              //
 //***************************************************************************//
 
+// 申请size个map_pointer空间并0初始化map，返回map头指针（申请map）
 template <class T>
 typename deque<T>::map_pointer
 deque<T>::creat_map(size_type size)
@@ -407,6 +526,7 @@ deque<T>::creat_map(size_type size)
     return mp;
 }
 
+// 为[nstart, nfinish] 所指的 buffer 申请空间 (为已构造好的map申请buffer）
 template <class T>
 void
 deque<T>::creat_buffer(map_pointer nstart, map_pointer nfinish)
@@ -426,6 +546,7 @@ deque<T>::creat_buffer(map_pointer nstart, map_pointer nfinish)
     }
 }
 
+// 初始化map及buffer，初始化后的map个数比已分配的buffer个数长2或更多
 template <class T>
 void
 deque<T>::map_init(size_type nElem)
@@ -499,6 +620,90 @@ deque<T>::copy_init(FIter first, FIter last, forward_iterator_tag)
     }
     deonSTL::uninitialized_copy(first, last, end_.first);
 }
+
+template <class T>
+void
+deque<T>::reallocate_map_at_front(size_type need_buffer)
+{
+    const size_type new_size = std::max(map_size_ << 1, map_size_ + need_buffer + 8);
+    map_pointer new_map = creat_map(new_size);
+    const size_type old_nNode = end_.node - begin_.node + 1;
+    const size_type new_nNode = old_nNode + need_buffer;
+    
+    auto begin = new_map + (new_size - new_nNode) / 2;
+    auto mid   = begin + need_buffer; // 指向被拷贝的第一个节点
+    auto end   = begin + new_nNode;
+    creat_buffer(begin, mid-1);
+    for(auto begin1 = mid, begin2 = begin_.node; begin1 != end; ++begin1, ++begin2)
+        *begin1 = *begin2;
+    
+    map_allocator::deallocate(map_, map_size_);
+    map_ = new_map;
+    map_size_ = new_size;
+    begin_ = iterator(*mid + (begin_.cur - begin_.first), mid);
+    end_   = iterator(*(end_ - 1) + (end_.cur - end_.first), end_ - 1);
+}
+
+template <class T>
+void
+deque<T>::reallocate_map_at_back(size_type need_buffer)
+{
+    
+}
+
+template <class T>
+void
+deque<T>::require_capacity(size_type n, bool front)
+{
+    if(front && (static_cast<size_type>(begin_.cur - begin_.first)) < n)
+    {
+        const size_type need_buffer = (n - (begin_.cur - begin_.first)) / buffer_size + 1;
+        if(need_buffer > static_cast<size_type>(begin_.node - map_))
+        {
+            reallocate_map_at_front(need_buffer);
+            return;
+        }
+        creat_buffer(begin_.node - need_buffer, begin_.node - 1);
+    }
+    else if(!front && (static_cast<size_type>(end_.last - end_.cur - 1)) < n)
+    {
+        const size_type need_buffer = (n - (end_.last - end_.cur - 1)) / buffer_size + 1;
+        if(need_buffer > static_cast<size_type>((map_ + map_size_) - end_.node - 1))
+        {
+            reallocate_map_at_back(need_buffer);
+            return;
+        }
+        creat_buffer(end_.node + 1, end_.node + need_buffer);
+    }
+}
+
+template <class T>
+template <class ...Args>
+typename deque<T>::iterator
+deque<T>::insert_aux(iterator pos, Args&& ...args)
+{
+    const size_type elems_before = pos - begin_;
+    value_type value_copy = value_type(std::forward<Args>(args)...);
+    if(elems_before < (size() / 2))
+    {
+        emplace_front(front());
+        auto front1 = begin_ + 1;
+        auto front2 = front1 + 1;
+        pos = begin_ + elems_before + 1;
+        std::copy(front2, pos, front1);
+    }
+    else
+    {
+        emplace_back(back());
+        auto back1 = end_ - 1;
+        auto back2 = back1 - 1;
+        pos = begin_ + elems_before;
+        std::copy_backward(pos, back2, back1);
+    }
+    *pos = std::move(value_copy);
+    return pos;
+}
+
 
 //***************************************************************************//
 //                            equal operator                                 //

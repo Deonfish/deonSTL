@@ -7,26 +7,13 @@
 //
 
 #include <iostream>
-#include <vector>
-#include <typeinfo>
-#include "allocator.h"
+#include <string>
+#include "deque.h"
+#include "vector.h"
+using namespace std;
 
-
-class Foo{
-public:
-    Foo(int _x = -1, int _y = -1): x(_x), y(_y) { }
-    int x, y;
-};
-
-template <class T>
-void f(const T& param)
+int main()
 {
-    std::cout << typeid(param).name() << std::endl;
-}
-
-int main(){
-    using namespace std;
-    int x{};
-    cout << x << endl;
+    
     return 0;
 }
