@@ -285,6 +285,8 @@ public:
     
     // resize, shrink_to_fit
     
+    void                shrink_to_fit() noexcept;
+    
     // front, back
     reference           front()
     {
@@ -334,12 +336,14 @@ public:
     void        insert(iterator position, IIter first, IIter last);
     
     // erase
+    iterator    erase(iterator pos);
+    iterator    erase(iterator first, iterator last);
     
     // clear
-    void clear();
+    void        clear();
     
     // swap
-    void swap(deque& rhs) noexcept;
+    void        swap(deque& rhs) noexcept;
     
 private:
     // ==========================辅助函数=========================== //
@@ -372,6 +376,7 @@ private:
     
     
     
+    
 };// class deque
 
 //***************************************************************************//
@@ -398,7 +403,7 @@ deque<T>::emplace_front(Args&& ...args)
 {
     if(begin_.cur != begin_.first)
     {
-        data_allocator::construct(begin_.cur - 1, std::forward<Args>(args)...);
+        data_allocator::construct(begin_.cur - 1, std::forward<Args>(args)...); // 调用 构造函数
         --begin_.cur;
     }
     else
@@ -444,6 +449,81 @@ deque<T>::emplace(iterator pos, Args&& ...args)
         return end_; // 返回尾后迭代器？
     }
     return insert_aux(pos, std::forward<Args>(args)...);
+}
+
+// push_front 在头部插入元素
+template <class T>
+void
+deque<T>::push_front(const value_type &value)
+{
+    if(begin_.cur != begin_.first)
+    {
+        data_allocator::construct(begin_.cur - 1, value); // 调用 拷贝构造函数
+        --begin_.cur;
+    }
+    else
+    {
+        require_capacity(1, true);
+        --begin_;
+        data_allocator::construct(begin_.cur, value);
+    }
+}
+
+// push_back 在尾部插入元素
+template <class T>
+void
+deque<T>::push_back(const value_type &value)
+{
+    if(end_.cur != end_.last - 1)
+    {
+        data_allocator::construct(end_.cur, value);
+        ++end_.cur;
+    }
+    else
+    {
+        require_capacity(1, false);
+        data_allocator::construct(end_.cur, value);
+        ++end_;
+    }
+}
+
+// pop_back 弹出头部元素
+template <class T>
+void
+deque<T>::pop_front()
+{
+    MY_DEBUG(!empty());
+    if(begin_.cur != begin_.last - 1)
+    {
+        data_allocator::destroy(begin_.cur);
+        ++begin_.cur;
+    }
+    else
+    {
+        data_allocator::destroy(begin_.cur);
+        destroy_buffer(begin_.node, begin_.node); // 销毁不用的buffer
+        ++begin_;
+    }
+}
+
+// pop_back 弹出尾部元素
+template <class T>
+void
+deque<T>::pop_back()
+{
+    MY_DEBUG(!empty());
+    if(end_.cur != end_.first)
+    {
+        --end_.cur;
+        data_allocator::destroy(end_.cur);
+    }
+    else
+    {// 此时buffers状态：[full buffer][ ] 后一个 buffer 中虽然没有元素但依然要存在，
+     // 因为end.cur要指向这个空buffer（上一个buffer的尾后元素是下一个buffer的第一个元素）
+        --end_;
+        data_allocator::destroy(end_.cur);
+        destroy_buffer(end_.node + 1, end_.node + 1);
+    }
 }
 
 template <class T>
@@ -508,6 +588,63 @@ deque<T>::insert(iterator pos, size_type n, const value_type &value)
         fill_insert(pos, n, value);
 }
 
+template <class T>
+typename deque<T>::iterator
+deque<T>::erase(iterator pos)
+{
+    auto next = pos;
+    ++next;
+    const size_type elems_before = pos - begin_;
+    if(elems_before < (size() / 2))
+    {
+        std::copy_backward(begin_, pos, next);
+        pop_front();
+    }
+    else
+    {
+        std::copy(next, end_, pos);
+        pop_back();
+    }
+    return begin_ + elems_before;
+}
+
+template <class T>
+typename deque<T>::iterator
+deque<T>::erase(iterator first, iterator last)
+{
+    if(first == begin_ && last == end_)
+    {
+        clear();
+        return end_;
+    }
+    else
+    {
+        /*
+         源码不保证begin_之前的buffer为未申请空间buffer，
+         在begin_.node指向的buffer满之后再push_front，在已有的空间上再create_buffer可能造成内存泄露
+         */
+    }
+}
+
+template <class T>
+void
+deque<T>::clear()
+{
+    // 析构除头部尾部的中间buffer
+    for(map_pointer cur = begin_.node +1; cur < end_.node; ++cur)
+        data_allocator::destroy(*cur, *cur + buffer_size);
+    // 析构头部和尾部
+    if(begin_.node != end_.node)
+    {
+        data_allocator::destroy(begin_.cur, begin_.last);
+        data_allocator::destroy(end_.cur, end_.last);
+    }
+    else
+        data_allocator::destroy(begin_.cur, begin_.last);
+    
+    shrink_to_fit();
+    end_ = begin_;
+}
 
 
 //***************************************************************************//
@@ -651,6 +788,7 @@ deque<T>::reallocate_map_at_back(size_type need_buffer)
     
 }
 
+// require_capacity 在前或后扩充n个元素的空间，调用时buffer已经填满，需要申请buffer(不管map的情况)
 template <class T>
 void
 deque<T>::require_capacity(size_type n, bool front)
@@ -709,9 +847,24 @@ deque<T>::insert_aux(iterator pos, Args&& ...args)
 //                            equal operator                                 //
 //***************************************************************************//
 
+template <class T>
+bool operator==(const deque<T>& lhs, const deque<T>& rhs)
+{
+    return lhs.size() == rhs.size() &&
+    std::equal(lhs.begin(), lhs.end(), rhs.begin());
+}
 
+template <class T>
+bool operator!=(const deque<T>& lhs, const deque<T>& rhs)
+{
+    return !(lhs == rhs);
+}
 
-
+template <class T>
+void swap(deque<T>& lhs, deque<T>& rhs)
+{
+    lhs.swap(rhs);
+}
 
 
 
