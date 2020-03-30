@@ -196,15 +196,10 @@ public:
     void clear()
     { erase(begin_, end_); }
     
-    
     // resize
     void resize(size_type new_size)
     { return resize(new_size, value_type()); }
     void resize(size_type new_size, const value_type& value);
-    
-    // reverse
-    void reverse()
-    { std::reverse(begin(), end()); }
     
     // swap
     
@@ -330,7 +325,7 @@ void vector<T>::shrink_to_fit()
 
 
 
-// emplace 就地(pos)构造元素，避免复制，空间不够时只扩充一个，返回插入位置
+// emplace 在pos处构造元素，构造元素时调用移动构造函数和直接构造函数（可能有拷贝赋值符号），返回插入位置
 template <class T>
 template <class... Args>
 typename vector<T>::iterator
@@ -339,24 +334,24 @@ vector<T>::emplace(const_iterator pos, Args&& ...args)
     // 可以在 [begin, end] 的任何位置构造
     MY_DEBUG(pos >= begin_ && pos <= end_);
     iterator xpos = const_cast<iterator>(pos);
+    const size_type offset = xpos - begin_;
     if(end_ != cap_ && xpos == end_)
-    {// 在已申请但没有构造的尾部
+    {// 在尾部插入，空间足够
         data_allocator::construct(std::addressof(*end_), std::forward<Args>(args)...);
         ++end_;
     }
     else if(end_ != cap_)
-    {// 在已申请且已构造的中部(尾迭代器空间已经申请) , 与源码不一致！⚠️
+    {// 在中部插入，空间足够
         data_allocator::construct(std::addressof(*end_), *(end_ - 1));
         std::copy_backward(xpos, end_-1, end_);
-        *xpos = value_type(std::forward<Args>(args)...); // 不会调用 移动拷贝函数？
-        ++end_;
+        *xpos = value_type(std::forward<Args>(args)...); // 调用 移动构造函数和拷贝赋值函数
+        ++end_; // 与源码不一致 ⚠️
     }
     else
-    {// 在未申请未构造的尾部，申请一个空间
-        reallocate_emplace(end_, std::forward<Args>(args)...);
-        // ++end ?
+    {// 空间不够
+        reallocate_emplace(xpos, std::forward<Args>(args)...);
     }
-    return xpos;
+    return begin_ + offset;
 }
 
 // emplace_back 直接构造，避免复制
@@ -400,29 +395,31 @@ void vector<T>::pop_back()
     --end_;
 }
 
+// insert 在pos处插入元素，插入时调用拷贝构造函数（可能有拷贝赋值符号），返回插入位置
 template <class T>
 typename vector<T>::iterator
 vector<T>::insert(const_iterator pos, const value_type &value)
 {
     MY_DEBUG(pos >= begin_ && pos <= end_);
     iterator xpos = const_cast<iterator>(pos);
+    const size_type offset = pos - begin_;
     if(end_ != cap_ && xpos == end_)
-    {
+    {// 在尾部插入，空间足够
         data_allocator::construct(std::addressof(*end_), value);
         ++end_;
     }
     else if(end_ != cap_)
-    {
+    {// 在中部插入，空间足够
         data_allocator::construct(std::addressof(*end_), *(end_ - 1));
         std::copy_backward(xpos, end_-1, end_);
-        *xpos = value_type(value);
+        *xpos = value_type(value);  // 调用 构造函数和拷贝赋值函数 (源码调用移动赋值函数？⚠️）
         ++end_;
     }
     else
-    {
+    {// 空间不够
         reallocate_insert(xpos, value);
     }
-    return xpos;
+    return begin_ + offset;
 }
 
 template <class T>
@@ -554,7 +551,32 @@ vector<T>::get_new_cap(size_type add_size)
     return new_size;
 }
 
-// reallocate_insert 空间不够时调用，动态增长并插入
+// reallocate_emplace 重新申请另一块空间并构造插入元素，并管理begin_,end_,cap_
+template <class T>
+template <class ...Args>
+void
+vector<T>::reallocate_emplace(iterator pos, Args&& ...args)
+{
+    const size_type new_size = get_new_cap(1);
+    iterator new_begin = data_allocator::allocate(new_size);
+    iterator new_end = new_begin;
+    try {
+        new_end = deonSTL::uninitialized_move(begin_, pos, new_begin);
+        data_allocator::construct(std::addressof(*new_end), std::forward<Args>(args)...); // 调用 构造函数
+        ++new_end;
+        new_end = deonSTL::uninitialized_move(pos, end_, new_end);
+    } catch (...) {
+        data_allocator::deallocate(new_begin);
+        throw;
+    }
+    destroy_and_recover(begin_, end_);
+    begin_ = new_begin;
+    end_ = new_end;
+    cap_ = new_begin + new_size;
+}
+
+
+// reallocate_insert 重新申请另一块空间并插入元素，并管理begin_,end_,cap_
 template <class T>
 void vector<T>::reallocate_insert(iterator pos, const value_type &value)
 {
@@ -563,8 +585,9 @@ void vector<T>::reallocate_insert(iterator pos, const value_type &value)
     iterator new_end = new_begin;
     try {
         new_end = uninitialized_move(begin_, pos, new_begin);
-        data_allocator::construct(pos, value);
+        data_allocator::construct(pos, value);  // 调用 拷贝构造函数
         ++new_end;
+        new_end = uninitialized_move(pos, end_, new_end);
     } catch (...) {
         data_allocator::destroy(new_begin, new_end);
     }
