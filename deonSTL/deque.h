@@ -258,7 +258,10 @@ public:
         if(map_ != nullptr)
         {
             clear();
-            
+            data_allocator::deallocate(*begin_.node, buffer_size);
+            *begin_.node = nullptr;
+            map_allocator::deallocate(map_, map_size_);
+            map_ = nullptr;
         }
     }
     
@@ -284,6 +287,8 @@ public:
     { return static_cast<size_type>(-1); }
     
     // resize, shrink_to_fit
+    void                resize(size_type new_size) { resize(new_size, value_type()); }
+    void                resize(size_type new_size, const value_type& value);
     
     void                shrink_to_fit() noexcept;
     
@@ -349,9 +354,9 @@ private:
     // ==========================辅助函数=========================== //
 
     // 创建/销毁 node，map
-    map_pointer creat_map(size_type size);
-    void        creat_buffer(map_pointer nstart, map_pointer nfinish);
-    void        destroy_buffer(map_pointer nstart, map_pointer nfinish);
+    map_pointer create_map(size_type size);
+    void        create_buffer(map_pointer nstart, map_pointer nfinish);
+    void        recover_buffer(map_pointer nstart, map_pointer nfinish);
     
     // 初始化 map
     void        map_init(size_type nelem);
@@ -373,7 +378,10 @@ private:
     iterator    insert_aux(iterator pos, Args&& ...args);
     
     void        fill_insert(iterator pos, size_type n, const value_type& value);
-    
+    template <class FIter>
+    void        copy_insert(iterator pos, FIter first, FIter last);
+    template <class IIter>
+    void        insert_dispatch(iterator pos, IIter first, IIter last, input_iterator_tag);
     
     
     
@@ -383,8 +391,32 @@ private:
 //                           member functions                                //
 //***************************************************************************//
 
+// 拷贝赋值操作符
 template <class T>
-deque<T>& deque<T>::operator=(deque<T> &&rhs)
+deque<T>&
+deque<T>::operator=(const deque& rhs)
+{
+    if(this != &rhs)
+    {
+        const size_type len = size();
+        if(len > rhs.size())
+        {
+            erase(std::copy(rhs,begin(), rhs.end(), begin_), end_);
+        }
+        else
+        {
+            iterator rhs_mid = rhs.begin() + static_cast<difference_type>(len);
+            std::copy(rhs.begin(), rhs_mid, begin_);
+            insert(end_, rhs_mid, rhs.end_);
+        }
+    }
+    return *this;
+}
+
+// 移动赋值操作符
+template <class T>
+deque<T>&
+deque<T>::operator=(deque<T> &&rhs)
 {
     clear();
     begin_ = std::move(rhs.begin_);
@@ -396,6 +428,39 @@ deque<T>& deque<T>::operator=(deque<T> &&rhs)
     return *this;
 }
 
+// resize 重新size大小为new_size，多出的部分用value填充
+template <class T>
+void
+deque<T>::resize(size_type new_size, const value_type& value)
+{
+    const auto len = size();
+    if(new_size < len)
+        erase(begin_ + new_size, end_);
+    else
+        insert(end_, new_size - len, value);
+}
+
+// shrink_to_fit 回收头部以前和尾部以后的不用空间
+template <class T>
+void
+deque<T>::shrink_to_fit() noexcept
+{
+    // 对 begin_ == end_ 调用会留下一个buffer
+    // 回收头部不用空间
+    for(auto cur = map_; cur < begin_.node; ++cur)
+    {
+        data_allocator::deallocate(*cur, buffer_size);
+        *cur = nullptr;
+    }
+    // 回收尾部不用空间
+    for(auto cur = end_.node + 1; cur < map_ + map_size_; ++cur)
+    {
+        data_allocator::deallocate(*cur, buffer_size);
+        *cur = nullptr;
+    }
+}
+
+// emplace_front 在头部插入元素，调用构造函数
 template <class T>
 template <class ...Args>
 void
@@ -415,6 +480,7 @@ deque<T>::emplace_front(Args&& ...args)
 }
 
 // 与源码不一致
+// emplace_back 在尾部插入元素，调用构造函数
 template <class T>
 template <class ...Args>
 void
@@ -433,6 +499,7 @@ deque<T>::emplace_back(Args&& ...args)
     }
 }
 
+// emplace 在pos前插入元素，调用构造函数，返回插入的尾后迭代器
 template <class T>
 template <class ...Args>
 typename deque<T>::iterator
@@ -501,7 +568,7 @@ deque<T>::pop_front()
     else
     {
         data_allocator::destroy(begin_.cur);
-        destroy_buffer(begin_.node, begin_.node); // 销毁不用的buffer
+        recover_buffer(begin_.node, begin_.node); // 销毁不用的buffer
         ++begin_;
     }
 }
@@ -522,10 +589,11 @@ deque<T>::pop_back()
      // 因为end.cur要指向这个空buffer（上一个buffer的尾后元素是下一个buffer的第一个元素）
         --end_;
         data_allocator::destroy(end_.cur);
-        destroy_buffer(end_.node + 1, end_.node + 1);
+        recover_buffer(end_.node + 1, end_.node + 1);
     }
 }
 
+// insert 在pos前插入元素，返回尾后迭代器
 template <class T>
 typename deque<T>::iterator
 deque<T>::insert(iterator pos, const value_type &value)
@@ -546,6 +614,7 @@ deque<T>::insert(iterator pos, const value_type &value)
         return insert_aux(pos, value);
 }
 
+// insert 在pos前插入元素，调用构造函数，返回尾后迭代器
 template <class T>
 typename deque<T>::iterator
 deque<T>::insert(iterator pos, value_type &&value)
@@ -566,6 +635,7 @@ deque<T>::insert(iterator pos, value_type &&value)
         return insert_aux(pos, std::move(value));
 }
 
+// insert 在pos前插入n个元素
 template <class T>
 void
 deque<T>::insert(iterator pos, size_type n, const value_type &value)
@@ -588,6 +658,7 @@ deque<T>::insert(iterator pos, size_type n, const value_type &value)
         fill_insert(pos, n, value);
 }
 
+// erase 删除pos处的元素，不回收空间，返回尾后迭代器
 template <class T>
 typename deque<T>::iterator
 deque<T>::erase(iterator pos)
@@ -608,10 +679,11 @@ deque<T>::erase(iterator pos)
     return begin_ + elems_before;
 }
 
+// erase 删除[first, last)的内容，不回收空间，返回尾后迭代器
 template <class T>
 typename deque<T>::iterator
 deque<T>::erase(iterator first, iterator last)
-{
+{// 会产生begin_之前和end_之后的未使用buffer
     if(first == begin_ && last == end_)
     {
         clear();
@@ -623,14 +695,32 @@ deque<T>::erase(iterator first, iterator last)
          源码不保证begin_之前的buffer为未申请空间buffer，
          在begin_.node指向的buffer满之后再push_front，在已有的空间上再create_buffer可能造成内存泄露
          */
+        const size_type len = last - first;
+        const size_type elems_before = first - begin_;
+        if(elems_before < (size() - len) / 2)
+        {
+            std::copy_backward(begin_, first, last);
+            auto new_begin = begin_ + len;
+            data_allocator::destroy(first.cur, new_begin.cur);
+            begin_ = new_begin;
+        }
+        else
+        {
+            std::copy(last, end_, first);
+            auto new_end = end_ - len;
+            data_allocator::destroy(new_end.cur, end_);
+            end_ = new_end;
+        }
+        return begin_ + elems_before;
     }
 }
 
+// clear 析构全部元素，留下一个buffer空间
 template <class T>
 void
 deque<T>::clear()
 {
-    // 析构除头部尾部的中间buffer
+    // 析构除头部尾部外的buffer
     for(map_pointer cur = begin_.node +1; cur < end_.node; ++cur)
         data_allocator::destroy(*cur, *cur + buffer_size);
     // 析构头部和尾部
@@ -642,19 +732,28 @@ deque<T>::clear()
     else
         data_allocator::destroy(begin_.cur, begin_.last);
     
+    end_ = begin_; // 源码此句在下一句之后
     shrink_to_fit();
-    end_ = begin_;
 }
 
+// swap
+template <class T>
+void deque<T>::swap(deque& rhs) noexcept
+{
+    std::swap(begin_, rhs.begin_); // 待编写⚠️
+    std::swap(end_, rhs.end_);
+    std::swap(map_, rhs.map_);
+    std::swap(map_size_, rhs.map_size_);
+}
 
 //***************************************************************************//
 //                             helper functions                              //
 //***************************************************************************//
 
-// 申请size个map_pointer空间并0初始化map，返回map头指针（申请map）
+// create_map 申请 size 个map_pointer空间并0初始化map，返回map头指针（申请map）
 template <class T>
 typename deque<T>::map_pointer
-deque<T>::creat_map(size_type size)
+deque<T>::create_map(size_type size)
 {
     map_pointer mp = nullptr;
     mp = map_allocator::allocate(size);
@@ -663,10 +762,10 @@ deque<T>::creat_map(size_type size)
     return mp;
 }
 
-// 为[nstart, nfinish] 所指的 buffer 申请空间 (为已构造好的map申请buffer）
+// create_buffer 为[nstart, nfinish] 所指的 buffer 申请空间 (为已构造好的map申请buffer）
 template <class T>
 void
-deque<T>::creat_buffer(map_pointer nstart, map_pointer nfinish)
+deque<T>::create_buffer(map_pointer nstart, map_pointer nfinish)
 {
     map_pointer cur = nstart;
     try {
@@ -683,7 +782,19 @@ deque<T>::creat_buffer(map_pointer nstart, map_pointer nfinish)
     }
 }
 
-// 初始化map及buffer，初始化后的map个数比已分配的buffer个数长2或更多
+// recover_buffer 回收 [nstart, nfinish] 指向的所有buffer内存
+template <class T>
+void
+deque<T>::recover_buffer(map_pointer nstart, map_pointer nfinish)
+{
+    for(map_pointer n = nstart; n <= nfinish; ++n)
+    {
+        data_allocator::deallocate(*n);
+        *n = nullptr;
+    }
+}
+
+// 初始化map及buffer，初始化后的map个数比已分配的buffer个数长2或更多，最少分配8个buffer
 template <class T>
 void
 deque<T>::map_init(size_type nElem)
@@ -693,7 +804,7 @@ deque<T>::map_init(size_type nElem)
     map_size_ = std::max(static_cast<size_type>(8), nNode + 2);
     
     try {
-        map_ = creat_map(map_size_);
+        map_ = create_map(map_size_);
     } catch (...) {
         map_ = nullptr;
         map_size_ = 0;
@@ -704,7 +815,7 @@ deque<T>::map_init(size_type nElem)
     map_pointer nstart = map_ + (map_size_ - nNode) /2;
     map_pointer nfinish = nstart + nNode - 1;
     try {
-        creat_buffer(nstart, nfinish);
+        create_buffer(nstart, nfinish);
     } catch (...) {
         map_allocator::deallocate(map_);
         map_ = nullptr;
@@ -717,6 +828,7 @@ deque<T>::map_init(size_type nElem)
     end_.cur = end_.first + (nElem % buffer_size);
 }
 
+// fill_init 初始化为 n 个 value 元素的deque
 template <class T>
 void
 deque<T>::fill_init(size_type n, const value_type &value)
@@ -730,6 +842,7 @@ deque<T>::fill_init(size_type n, const value_type &value)
     }
 }
 
+// copy_init 从 InputIter: [first, last) 拷贝初始化
 template <class T>
 template <class IIter>
 void
@@ -741,16 +854,17 @@ deque<T>::copy_init(IIter first, IIter last, input_iterator_tag)
         emplace_back(*first);
 }
 
+// copy_init 从 ForwardIter: [first, last) 拷贝初始化
 template <class T>
 template <class FIter>
 void
 deque<T>::copy_init(FIter first, FIter last, forward_iterator_tag)
-{
+{// 需要逐buffer拷贝，至少需要三个指针来完成
     const size_type n = deonSTL::distance(first, last);
     map_init(n);
     for(auto cur = begin_.node; cur < end_.node; ++cur)
     {
-        auto next = first;
+        auto next = first; // ForwardIter 才有赋值操作
         deonSTL::advance(next, buffer_size);
         deonSTL::uninitialized_copy(first, next, *cur);
         first = next;
@@ -758,63 +872,7 @@ deque<T>::copy_init(FIter first, FIter last, forward_iterator_tag)
     deonSTL::uninitialized_copy(first, last, end_.first);
 }
 
-template <class T>
-void
-deque<T>::reallocate_map_at_front(size_type need_buffer)
-{
-    const size_type new_size = std::max(map_size_ << 1, map_size_ + need_buffer + 8);
-    map_pointer new_map = creat_map(new_size);
-    const size_type old_nNode = end_.node - begin_.node + 1;
-    const size_type new_nNode = old_nNode + need_buffer;
-    
-    auto begin = new_map + (new_size - new_nNode) / 2;
-    auto mid   = begin + need_buffer; // 指向被拷贝的第一个节点
-    auto end   = begin + new_nNode;
-    creat_buffer(begin, mid-1);
-    for(auto begin1 = mid, begin2 = begin_.node; begin1 != end; ++begin1, ++begin2)
-        *begin1 = *begin2;
-    
-    map_allocator::deallocate(map_, map_size_);
-    map_ = new_map;
-    map_size_ = new_size;
-    begin_ = iterator(*mid + (begin_.cur - begin_.first), mid);
-    end_   = iterator(*(end_ - 1) + (end_.cur - end_.first), end_ - 1);
-}
-
-template <class T>
-void
-deque<T>::reallocate_map_at_back(size_type need_buffer)
-{
-    
-}
-
-// require_capacity 在前或后扩充n个元素的空间，调用时buffer已经填满，需要申请buffer(不管map的情况)
-template <class T>
-void
-deque<T>::require_capacity(size_type n, bool front)
-{
-    if(front && (static_cast<size_type>(begin_.cur - begin_.first)) < n)
-    {
-        const size_type need_buffer = (n - (begin_.cur - begin_.first)) / buffer_size + 1;
-        if(need_buffer > static_cast<size_type>(begin_.node - map_))
-        {
-            reallocate_map_at_front(need_buffer);
-            return;
-        }
-        creat_buffer(begin_.node - need_buffer, begin_.node - 1);
-    }
-    else if(!front && (static_cast<size_type>(end_.last - end_.cur - 1)) < n)
-    {
-        const size_type need_buffer = (n - (end_.last - end_.cur - 1)) / buffer_size + 1;
-        if(need_buffer > static_cast<size_type>((map_ + map_size_) - end_.node - 1))
-        {
-            reallocate_map_at_back(need_buffer);
-            return;
-        }
-        creat_buffer(end_.node + 1, end_.node + need_buffer);
-    }
-}
-
+// insert_aux 在pos前（原来的pos位置元素往后走）插入args参数构造的元素(可能调用构造函数或拷贝构造函数)，返回尾后迭代器(pos)
 template <class T>
 template <class ...Args>
 typename deque<T>::iterator
@@ -842,6 +900,220 @@ deque<T>::insert_aux(iterator pos, Args&& ...args)
     return pos;
 }
 
+// fill_insert 在pos之前插入n个value元素
+template <class T>
+void
+deque<T>::fill_insert(iterator pos, size_type n, const value_type &value)
+{
+    const size_type elems_before = pos - begin_;
+    const size_type len = size();
+    if(elems_before < (len / 2))
+    {// 移动前面的部分
+        require_capacity(n, true);
+        auto old_begin = begin_;
+        auto new_begin = begin_ - n;
+        pos = begin_ + elems_before;
+        if(elems_before >= n)
+        {// elems_before 一部分构造，一部分赋值, n 全部赋值
+            auto begin_n = begin_ + n;
+            deonSTL::uninitialized_copy(begin_, begin_n, new_begin);
+            begin_ = new_begin;
+            std::copy(begin_n, pos, old_begin);
+            std::fill(pos - n, pos, value);
+        }
+        else
+        {// elems_before 全部构造，n 一部分赋值，一部分构造
+            deonSTL::uninitialized_copy_n(begin_, elems_before, new_begin);
+            deonSTL::uninitialized_fill(new_begin + elems_before, begin_, value);
+            begin_ = new_begin;
+            std::fill(old_begin, pos, value);
+        }
+    }
+    else
+    {// 移动后面的部分
+        require_capacity(n, false);
+        auto old_end = end_;
+        auto new_end = end_ + n;
+        const size_type elems_after = len - elems_before;
+        pos = end_ - elems_after;
+        if(elems_after > n)
+        {// elems_after 一部分构造，一部分赋值，n 全部构造
+            auto end_n = end_ + n;
+            deonSTL::uninitialized_copy(end_n, end_, end_);
+            end_ = new_end;
+            std::copy(pos, end_n, old_end);
+            std::fill(pos, pos+n, value);
+        }
+        else
+        {// elems_after 全部赋值，n 一部分赋值，一部分构造
+            deonSTL::uninitialized_fill(end_, pos + n, value);
+            deonSTL::uninitialized_copy_n(pos, elems_after, pos + n);
+            end_ = new_end;
+            std::fill(pos, old_end, value);
+        }
+    }
+}
+
+// copy_insert 把[first, last)的内容插入到pos之前（ForwardIter版本）
+template <class T>
+template <class FIter>
+void
+deque<T>::copy_insert(iterator pos, FIter first, FIter last)
+{
+    const size_type n = deonSTL::distance(first, last);
+    const size_type elems_before = pos - begin_;
+    const size_type len = size();
+    if(elems_before < (len / 2))
+    {// 移动前面的部分
+        require_capacity(n, true);
+        auto old_begin = begin_;
+        auto new_begin = begin_ - n;
+        pos = begin_ + elems_before;
+        if(elems_before >= n)
+        {// elems_before 一部分构造，一部分赋值, n 全部赋值
+            auto begin_n = begin_ + n;
+            deonSTL::uninitialized_copy(begin_, begin_n, new_begin);
+            begin_ = new_begin;
+            std::copy(begin_n, pos, old_begin);
+            //std::fill(pos - n, pos, value);
+            std::copy(first, last, pos - n);
+        }
+        else
+        {// elems_before 全部构造，n 一部分赋值，一部分构造
+            auto mid = first;
+            deonSTL::advance(mid, n - elems_before);
+            deonSTL::uninitialized_copy(begin_, pos, new_begin);
+            deonSTL::uninitialized_copy(first, mid, new_begin + elems_before);
+            begin_ = new_begin;
+            std::copy(mid, last, old_begin);
+        }
+    }
+    else
+    {// 移动后面的部分
+        require_capacity(n, false);
+        auto old_end = end_;
+        auto new_end = end_ + n;
+        const size_type elems_after = len - elems_before;
+        pos = end_ - elems_after;
+        if(elems_after > n)
+        {// elems_after 一部分构造，一部分赋值，n 全部构造
+            auto end_n = end_ + n;
+            deonSTL::uninitialized_copy(end_n, end_, end_);
+            end_ = new_end;
+            std::copy(pos, end_n, old_end);
+            //std::fill(pos, pos+n, value);
+            std::copy(first, last, pos);
+        }
+        else
+        {// elems_after 全部赋值，n 一部分赋值，一部分构造
+            auto mid = first;
+            deonSTL::advance(mid, elems_after);
+            deonSTL::uninitialized_copy(mid, last, end_);
+            deonSTL::uninitialized_copy(pos, end_, pos + n);
+            end_ = new_end;
+            std::copy(first, mid, pos);
+        }
+    }
+}
+
+// insert_dispatch 把[first, last)内容插入到pos之前（InputIter版本）
+template <class T>
+template <class IIter>
+void
+deque<T>::insert_dispatch(iterator pos, IIter first, IIter last, input_iterator_tag)
+{
+    if(last < first) return;
+    const size_type n = deonSTL::distance(first, last);
+    const size_type elems_before = pos - begin_;
+    if(elems_before < (size() / 2))
+        require_capacity(n, true);
+    else
+        require_capacity(n, false);
+    pos = begin_ + elems_before;
+    auto cur = --last;
+    for(size_type i = 0; i < n; ++i, --cur)
+        insert(pos, *cur);
+}
+
+// require_capacity 在头部/尾部需要n个元素空间，不足则申请
+template <class T>
+void
+deque<T>::require_capacity(size_type n, bool front)
+{
+    if(front && (static_cast<size_type>(begin_.cur - begin_.first)) < n)
+    {
+        const size_type need_buffer = (n - (begin_.cur - begin_.first)) / buffer_size + 1;
+        if(need_buffer > static_cast<size_type>(begin_.node - map_))
+        {
+            reallocate_map_at_front(need_buffer);
+            return;
+        }
+        create_buffer(begin_.node - need_buffer, begin_.node - 1);
+    }
+    else if(!front && (static_cast<size_type>(end_.last - end_.cur - 1)) < n)
+    {
+        const size_type need_buffer = (n - (end_.last - end_.cur - 1)) / buffer_size + 1;
+        if(need_buffer > static_cast<size_type>((map_ + map_size_) - end_.node - 1))
+        {
+            reallocate_map_at_back(need_buffer);
+            return;
+        }
+        create_buffer(end_.node + 1, end_.node + need_buffer);
+    }
+}
+
+
+// reallocate_map_at_front 重新申请map，在map前创建 need_buffer 个 buffer
+template <class T>
+void
+deque<T>::reallocate_map_at_front(size_type need_buffer)
+{
+    const size_type new_size = std::max(map_size_ << 1, map_size_ + need_buffer + 8);
+    map_pointer new_map = create_map(new_size);
+    const size_type old_nNode = end_.node - begin_.node + 1;
+    const size_type new_nNode = old_nNode + need_buffer;
+    
+    auto begin = new_map + (new_size - new_nNode) / 2;
+    auto mid   = begin + need_buffer; // 指向被拷贝的第一个节点
+    auto end   = begin + new_nNode;
+    create_buffer(begin, mid-1);
+    for(auto begin1 = mid, begin2 = begin_.node; begin1 != end; ++begin1, ++begin2)
+        *begin1 = *begin2;
+    
+    map_allocator::deallocate(map_, map_size_);
+    map_      = new_map;
+    map_size_ = new_size;
+    begin_    = iterator(*mid + (begin_.cur - begin_.first), mid);
+    end_      = iterator(*(end_ - 1) + (end_.cur - end_.first), end_ - 1);
+}
+
+// reallocate_map_at_back 重新申请map，在map前后创建 need_buffer 个 buffer
+template <class T>
+void
+deque<T>::reallocate_map_at_back(size_type need_buffer)
+{
+    // 申请new_map
+    const size_type new_size = std::max(map_size_ << 1, map_size_ + need_buffer + 8);
+    map_pointer new_map = create_map(new_size);
+    const size_type old_nNode = end_.node - begin_.node + 1;
+    const size_type new_nNode = old_nNode + need_buffer;
+    
+    // 移动原buffer, 开辟新buffer
+    auto begin = new_map + ((new_size - new_nNode) / 2);
+    auto mid = begin + old_nNode;
+    auto end = begin + new_nNode;
+    for(auto begin1 = begin, begin2 = begin_.node; begin1 != mid; ++begin1, ++begin2)
+        *begin1 = *begin2;
+    create_buffer(mid, end-1);
+    
+    // 更新数据
+    map_allocator::deallocate(map_, map_size_);
+    map_      = new_map;
+    map_size_ = new_size;
+    begin_    = iterator(*begin + (begin_.cur - begin_.first), begin);
+    end_      = iterator(*(mid - 1) + (end_.cur - end_.first), mid - 1);
+}
+
 
 //***************************************************************************//
 //                            equal operator                                 //
@@ -865,8 +1137,6 @@ void swap(deque<T>& lhs, deque<T>& rhs)
 {
     lhs.swap(rhs);
 }
-
-
 
 
 }// namespase deonSTL
