@@ -15,6 +15,19 @@ namespace deonSTL{
 
 // 使用标准库的 type_traits 实现判断是否 trivial
 
-}
+//============================================//
+
+template <class T1, class T2>
+struct pair;
+
+// is_pair 传入单键或键值对对象，可以判断是否为pair对象
+template <class T>
+struct is_pair : std::false_type {};
+
+template <class T1, class T2>
+struct is_pair<deonSTL::pair<T1, T2>> : std::true_type {};
+
+
+} // namespace deonSTL
 
 #endif /* type_traits_h */
