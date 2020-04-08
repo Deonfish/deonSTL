@@ -27,7 +27,7 @@ struct pair
 
 };
 
-template <Ty1, Ty2>
+template <class Ty1, class Ty2>
 pair<Ty1, Ty2> make_pair(Ty1&& first, Ty2&& second)
 {
     return pair<Ty1, Ty2>(std::forward<Ty1>(first), std::forward<Ty2>(second));
