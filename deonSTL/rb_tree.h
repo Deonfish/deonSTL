@@ -287,66 +287,123 @@ struct rb_tree_const_iterator : public iterator<deonSTL::bidirectional_iterator_
 
 //***************************************************************************//
 //                            tree algorithms                                //
+//                        均为模板函数，可应用于自定义节点                         //
 //***************************************************************************//
 
 template <class NodePtr>
 NodePtr rb_tree_min(NodePtr x) noexcept
 {
-    
+    while(x->left != nullptr)
+        x = x->left;
+    return x;
 }
 
 template <class NodePtr>
 NodePtr rb_tree_max(NodePtr x) noexcept
 {
-    
+    while(x->right != nullptr)
+        x = x->right;
+    return x;
 }
 
 template <class NodePtr>
 bool rb_tree_is_lchild(NodePtr node) noexcept
-{
-    
+{// 对根节点不做特殊处理
+    return node == node->parent->left;
 }
 
 template <class NodePtr>
 bool rb_tree_is_rchild(NodePtr node) noexcept
 {
-    
+    return node == node->parent->right;
 }
 
 template <class NodePtr>
 bool rb_tree_is_red(NodePtr node) noexcept
 {
-    
+    return node->color == rb_tree_red;
 }
 
 template <class NodePtr>
 void rb_tree_set_black(NodePtr& node) noexcept
 {
-    
+    node->color = rb_tree_black;
 }
 
 template <class NodePtr>
 void rb_tree_set_red(NodePtr& node) noexcept
 {
-    
+    node->color = rb_tree_red;
 }
 
 template <class NodePtr>
 NodePtr rb_tree_next(NodePtr node) noexcept
-{
-    
+{// 此函数不适用于本rb_tree（无法处理边界条件）
+    if(node->right != nullptr)
+        return rb_tree_min(node->right);
+    while(!rb_tree_is_lchild(node))
+        node = node->parent;
+    return node->parent;
 }
 
+/*---------------------------------------*\
+|       p                         p       |
+|      / \                       / \      |
+|     x   d    rotate left      y   d     |
+|    / \       ===========>    / \        |
+|   a   y                     x   c       |
+|      / \                   / \          |
+|     b   c                 a   b         |
+\*---------------------------------------*/
+// 左旋，参数一为左旋点，参数二为根节点
 template <class NodePtr>
 void rb_tree_rotate_left(NodePtr x, NodePtr& root) noexcept
 {
+    auto y = x->right;
+    x->right = y->left;
+    if(y->left != nullptr)
+        y->left->parent = x;
+    y->parent = x->parent;
     
+    if(x == root) // x为根节点
+        root = y;
+    else if(rb_tree_is_lchild(x)) // x 为左子节点
+        x->parent->left = y;
+    else
+        x->parent->right = y; // x 为右子节点
+    
+    y->left = x;
+    x->parent = y;
 }
 
+/*----------------------------------------*\
+|     p                         p          |
+|    / \                       / \         |
+|   d   x      rotate right   d   y        |
+|      / \     ===========>      / \       |
+|     y   a                     b   x      |
+|    / \                           / \     |
+|   b   c                         c   a    |
+\*----------------------------------------*/
+// 右旋，参数一为右旋点，参数二为根节点
 template <class NodePtr>
 void rb_tree_rotate_right(NodePtr x, NodePtr& root) noexcept
 {
-    
+    auto y = x->left;
+    x->left = y->right;
+    if (y->right)
+      y->right->parent = x;
+    y->parent = x->parent;
+
+    if (x == root) // 如果 x 为根节点，让 y 顶替 x 成为根节点
+      root = y;
+    else if (rb_tree_is_lchild(x)) // 如果 x 是右子节点
+      x->parent->left = y;
+    else // 如果 x 是左子节点
+      x->parent->right = y;
+    // 调整 x 与 y 的关系
+    y->right = x;
+    x->parent = y;
 }
 
 template <class NodePtr>
@@ -398,7 +455,7 @@ class rb_tree
     typedef rb_tree_const_iterator<T>                           const_iterator;
     
 private:
-    base_ptr    header_;        // 特殊节点，与跟节点互为对方的父节点
+    base_ptr    header_;        // 特殊节点，与跟节点互为对方的父节点，左、右分别指向树的最小值、最大值
     size_type   node_count_;    // 节点数
     key_compare key_comp_;      // 比较准则
     

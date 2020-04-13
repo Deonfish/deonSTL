@@ -14,7 +14,6 @@ using namespace std;
 
 int main()
 {
-    vector<int>::iterator it;
-    vector<int>::const_iterator cit;
+
     return 0;
 }
