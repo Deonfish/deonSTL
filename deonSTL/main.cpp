@@ -8,13 +8,13 @@
 
 #include <iostream>
 #include "rb_tree.h"
+#include <vector>
 using namespace std;
 
-void func(const int& x)
-{ cout << "in func\n"; }
 
 int main()
 {
-    
+    vector<int>::iterator it;
+    vector<int>::const_iterator cit;
     return 0;
 }

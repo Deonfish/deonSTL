@@ -23,7 +23,6 @@ static constexpr rb_tree_color_type rb_tree_red   = false;
 static constexpr rb_tree_color_type rb_tree_black = true;
 
 // 前向声明
-template <class T> struct rb_tree_node_base;
 template <class T> struct rb_tree_node;
 
 template <class T> struct rb_tree_iterator;
@@ -37,10 +36,12 @@ struct rb_tree_value_traits_imp
     typedef T mapped_type;
     typedef T value_type;
     
-    template <class Ty>
+    // get_key
+    template <class Ty> // 声明为模板函数，不用显示指出value类型
     static const key_type&   get_key(const Ty& value)
     { return value; }
     
+    // get_value
     template <class Ty>
     static const value_type& get_value(const Ty& value)
     { return value; }
@@ -54,10 +55,12 @@ struct rb_tree_value_traits_imp<T, true>
     typedef typename T::second_type                                 mapped_type;
     typedef T                                                       value_type;
     
-    template <class Ty> // 此处为什么要声明为模版成员函数❓
+    // get_key
+    template <class Ty>
     static const key_type&   get_key(const Ty& value)
     { return value.first; }
     
+    // get_value
     template <class Ty>
     static const value_type& get_value(const Ty& value)
     { return value.second; }
@@ -84,62 +87,21 @@ struct rb_tree_value_traits
     { return value_traits_type::get_value(value); }
     
 };
-/*
- 
-// node traits
-template <class T>
-struct rb_tree_node_traits
-{
-    typedef rb_tree_color_type                  color_type;
-    
-    typedef rb_tree_value_traits<T>             value_traits;
-    typedef typename value_traits::key_type     key_type;
-    typedef typename value_traits::mapped_type  mapped_type;
-    typedef typename value_traits::value_type   value_type;
-    
-    typedef rb_tree_node_base<T>*               base_ptr;
-    typedef rb_tree_node<T>*                    node_ptr;
-};
 
- */
-
-// node_base
+// node 实体
 template <class T>
-struct rb_tree_node_base // 不直接初始化该类
+struct rb_tree_node
 {
     typedef rb_tree_color_type      color_type;
-    typedef rb_tree_node_base<T>*   base_ptr;
     typedef rb_tree_node<T>*        node_ptr;
     
-    base_ptr    parent;     // 父节点
-    base_ptr    left;       // 左孩子
-    base_ptr    right;      // 右孩子
-    base_ptr    color;      // 节点颜色
-    
-    base_ptr get_base_ptr()
-    { return &*this; }
-    
-    node_ptr get_node_ptr()
-    { return reinterpret_cast<node_ptr>(&*this); } // 基类 -> 派生类
-    
-    node_ptr get_node_ref()
-    { return reinterpret_cast<node_ptr>(*this);  } // 基类 -> 派生类
-};
-
-// node
-template <class T>
-struct rb_tree_node : public rb_tree_node_base<T>
-{
-    typedef rb_tree_node_base<T>*   base_ptr;
-    typedef rb_tree_node<T>*        node_ptr;
+    node_ptr    parent;       // 父节点
+    node_ptr    left;         // 左孩子
+    node_ptr    right;        // 右孩子
+    color_type  color;      // 节点颜色
     
     T value;   // 节点值
-    
-    base_ptr get_base_ptr()
-    { return static_cast<base_ptr>(&*this); }
-    
-    node_ptr get_node_ptr()
-    { return &*this; }
+
 };
 
 // rb_tree_traits
@@ -157,85 +119,170 @@ struct rb_tree_traits
     typedef const value_type*                   const_pointer;
     typedef const value_type&                   const_reference;
     
-    typedef rb_tree_node_base<T>                base_type;
     typedef rb_tree_node<T>                     node_type;
-    
-    typedef base_type*                          base_ptr;
     typedef node_type*                          node_ptr;
 };
 
-// rb_tree base迭代器
-template <class T>
-struct rb_tree_iterator_base : public deonSTL::iterator<deonSTL::bidirectional_iterator_tag, T>
-{
-    typedef typename rb_tree_traits<T>::base_ptr   base_ptr;
-    
-    base_ptr node; // 指向base node
-    
-    void inc()
-    {
-        
-    }
-    
-    void dec()
-    {
-        
-    }
-    
-    bool operator==(const rb_tree_iterator_base& rhs) { return node == rhs.node; }
-    bool operator!=(const rb_tree_iterator_base& rhs) { return node != rhs.node; }
-};
-
-// rb_tree 迭代器
-template <class T>
-struct rb_tree_iterator : public rb_tree_iterator_base<T>
+// rb_tree 迭代器，双向迭代器
+template <class T> // T为value_type
+struct rb_tree_iterator : public deonSTL::iterator<deonSTL::bidirectional_iterator_tag, T>
 {
     typedef rb_tree_traits<T>                   tree_traits;
     
     typedef typename tree_traits::value_type    value_type;
     typedef typename tree_traits::pointer       pointer;
     typedef typename tree_traits::reference     reference;
-    typedef typename tree_traits::base_ptr      base_ptr;
     typedef typename tree_traits::node_ptr      node_ptr;
     
     typedef rb_tree_iterator<T>                 iterator;
     typedef rb_tree_const_iterator<T>           const_iterator;
     
-    using rb_tree_iterator_base<T>::node; // 声明用基类的node成员，加速编译
+    // 表现为指向value，实际指向node
+    node_ptr node; // 指向node节点
     
     // 构造函数
     rb_tree_iterator() {}
-    rb_tree_iterator(base_ptr x) { node = x; }
-    rb_tree_iterator(node_ptr x) { node = x; }
+    rb_tree_iterator(node_ptr x) : node(x) {}
     rb_tree_iterator(const iterator& rhs) { node = rhs.node; }
-    rb_tree_iterator(const const_iterator& rhs) { node = rhs.node; }
+    rb_tree_iterator(const const_iterator& rhs) { node = rhs.node; } // const_iter -> iter
     
     // 重载操作符
-    reference operator*()  const { return node->get_node_ptr()->value; }
+    reference operator*()  const { return node->value; }
     pointer   operator->() const { return &(operator*()); }
     
     iterator& operator++()
-    {
-        this->inc();
+    {// 寻找后继
+        if(node->right != nullptr)
+            node = rb_tree_min(node->right);
+        else
+        {// 无右子树，找第一个右祖先
+            node_ptr p = node->parent;
+            while (p->right == node)
+            {// 为左祖先
+                node = p;
+                p = p->parent;
+            }
+            if(node->right != p) // 只有一个根节点时，node已经指向header_
+                node = p;
+            // 若对最大元素++，node指向header_
+            // 若对空树++，node指向nullptr
+        }
         return *this;
     }
     iterator operator++(int)
     {
         iterator tmp(*this);
-        this->inc();
+        ++this;
         return tmp;
     }
     iterator& operator--()
-    {
-        this->dec();
+    {// 寻找前驱
+        if(node->left != nullptr)
+            node = rb_tree_max(node->left);
+        else
+        {// 无左子树，找第一个左祖先
+            node_ptr p = node->parent;
+            while (p->left == node)
+            {
+                node = p;
+                p = p->parent;
+            }
+            if(node->left != p) // 只有一个根节点时，node已经指向header_
+                node = p;
+            // 若对最小元素--，node指向header_
+            // 若对空树--，node指向nullptr
+        }
         return *this;
     }
     iterator operator--(int)
     {
         iterator tmp(*this);
-        this->dec();
+        --this;
         return tmp;
     }
+    bool operator==(const rb_tree_iterator& rhs) { return node == rhs.node; }
+    bool operator!=(const rb_tree_iterator& rhs) { return !(this == rhs); }
+};
+
+// rb_tree迭代器，const版本
+template <class T>
+struct rb_tree_const_iterator : public iterator<deonSTL::bidirectional_iterator_tag, T>
+{
+    typedef rb_tree_traits<T>                     tree_traits;
+    
+    typedef typename tree_traits::value_type      value_type;
+    typedef typename tree_traits::const_pointer   const_pointer;    // 底层const
+    typedef typename tree_traits::const_reference const_reference;  // 底层const
+    typedef typename tree_traits::node_ptr        node_ptr;
+    
+    typedef rb_tree_iterator<T>                   iterator;
+    typedef rb_tree_const_iterator<T>             const_iterator;
+    
+    // 为普通指针
+    node_ptr node; // 指向node节点
+    
+    // 构造函数
+    rb_tree_const_iterator() {}
+    rb_tree_const_iterator(node_ptr x) : node(x) {}
+    rb_tree_const_iterator(const iterator& rhs) { node = rhs.node; }    // iter -> const_iter
+    rb_tree_const_iterator(const const_iterator& rhs) { node = rhs.node; }
+    
+    // 重载操作符
+    const_reference operator*()  const { return node->value; }
+    const_pointer   operator->() const { return &(operator*()); }
+    
+    const_iterator& operator++()
+    {// 寻找后继
+        if(node->right != nullptr)
+            node = rb_tree_min(node->right);
+        else
+        {// 无右子树，找第一个右祖先
+            node_ptr p = node->parent;
+            while (p->right == node)
+            {// 为左祖先
+                node = p;
+                p = p->parent;
+            }
+            if(node->right != p) // 只有一个根节点时，node已经指向header_
+                node = p;
+            // 若对最大元素++，node指向header_
+            // 若对空树++，node指向nullptr
+        }
+        return *this;
+    }
+    const_iterator operator++(int)
+    {
+        iterator tmp(*this);
+        ++this;
+        return tmp;
+    }
+    const_iterator& operator--()
+    {// 寻找前驱
+        if(node->left != nullptr)
+            node = rb_tree_max(node->left);
+        else
+        {// 无左子树，找第一个左祖先
+            node_ptr p = node->parent;
+            while (p->left == node)
+            {
+                node = p;
+                p = p->parent;
+            }
+            if(node->left != p) // 只有一个根节点时，node已经指向header_
+                node = p;
+            // 若对最小元素--，node指向header_
+            // 若对空树--，node指向nullptr
+        }
+        return *this;
+    }
+    const_iterator operator--(int)
+    {
+        iterator tmp(*this);
+        --this;
+        return tmp;
+    }
+    bool operator==(const rb_tree_const_iterator& rhs) { return node == rhs.node; }
+    bool operator!=(const rb_tree_const_iterator& rhs) { return !(this == rhs); }
 };
 
 //***************************************************************************//
