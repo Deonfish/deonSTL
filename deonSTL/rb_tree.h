@@ -1000,7 +1000,7 @@ rb_tree<T, Compare>::get_insert_multi_pos(const key_type &key)
 {
     auto y = header_;
     auto x = root();
-    bool add_to_left = true; // 树为空也在 header_ 左插入
+    bool add_to_left = true;
     while(x != nullptr)
     {
         y = x;
@@ -1026,20 +1026,23 @@ rb_tree<T, Compare>::get_insert_unique_pos(const key_type &key)
         add_to_left = key_comp_(key, y->value);
         x = add_to_left ? x->left : x->right;
     }
-    iterator j = iterator(y); // j 为插入位置父节点迭代器，y为插入位置的父节点  <--待修改 ⚠️
+    // 若重复，则重复节点为前驱
+    iterator j = iterator(y);
     if(add_to_left)
-    {// 在一个节点的左边插入才有机会是重复的节点
+    {
         if(y == header_ || j == begin())
-        {// 此时j不可以减，为空树或插入位置父节点为开始节点，新节点一定不重复
+        {// 新节点没有前驱的情况，一定可以插入
             return deonSTL::make_pair(deonSTL::make_pair(y, true), true);
         }
         else // 若是重复插入，则--j就指向重复的节点（前驱）
             --j;
     }
+    // j 指向插入节点的前驱节点
     if(key_comp_(value_traits::get_key(*j), key))
     {// 小于，不重复
         return deonSTL::make_pair(deonSTL::make_pair(y, add_to_left), true);
     }
+    // j->key == key
     return deonSTL::make_pair(deonSTL::make_pair(y, add_to_left), false);
     
 }
