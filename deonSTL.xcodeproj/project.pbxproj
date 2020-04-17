@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		07006BB624489F4C00A185CF /* test.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 07006BB524489F4C00A185CF /* test.cpp */; };
 		079CE1472411148C00733E84 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 079CE1462411148C00733E84 /* main.cpp */; };
-		079CE1562411407300733E84 /* AllocatorTest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 079CE1542411407300733E84 /* AllocatorTest.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,6 +24,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		07006BB424489F0D00A185CF /* rb_tree_test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rb_tree_test.h; sourceTree = "<group>"; };
+		07006BB524489F4C00A185CF /* test.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test.cpp; sourceTree = "<group>"; };
 		071DEFD72425EBC800E6B9C3 /* exceptdef.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = exceptdef.h; sourceTree = "<group>"; };
 		071DEFD8242B672500E6B9C3 /* deque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = deque.h; sourceTree = "<group>"; };
 		071DEFD924348EC900E6B9C3 /* stack.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stack.h; sourceTree = "<group>"; };
@@ -33,8 +35,6 @@
 		079CE1462411148C00733E84 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		079CE150241115E000733E84 /* vector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = vector.h; sourceTree = "<group>"; };
 		079CE15124112CA600733E84 /* allocator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = allocator.h; sourceTree = "<group>"; };
-		079CE1542411407300733E84 /* AllocatorTest.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AllocatorTest.cpp; sourceTree = "<group>"; };
-		079CE1552411407300733E84 /* AllocatorTest.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = AllocatorTest.hpp; sourceTree = "<group>"; };
 		07C0E0D9241CE3AB00BF4200 /* iterator.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = iterator.h; sourceTree = "<group>"; };
 		07C0E0DA241D22C700BF4200 /* type_traits.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = type_traits.h; sourceTree = "<group>"; };
 		07C0E0DB241D26D700BF4200 /* uninitialized.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = uninitialized.h; sourceTree = "<group>"; };
@@ -91,8 +91,8 @@
 		079CE1522411401B00733E84 /* Test */ = {
 			isa = PBXGroup;
 			children = (
-				079CE1542411407300733E84 /* AllocatorTest.cpp */,
-				079CE1552411407300733E84 /* AllocatorTest.hpp */,
+				07006BB424489F0D00A185CF /* rb_tree_test.h */,
+				07006BB524489F4C00A185CF /* test.cpp */,
 			);
 			path = Test;
 			sourceTree = "<group>";
@@ -155,7 +155,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				079CE1472411148C00733E84 /* main.cpp in Sources */,
-				079CE1562411407300733E84 /* AllocatorTest.cpp in Sources */,
+				07006BB624489F4C00A185CF /* test.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
