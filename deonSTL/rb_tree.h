@@ -150,8 +150,11 @@ struct rb_tree_iterator : public deonSTL::iterator<deonSTL::bidirectional_iterat
     reference operator*()  const { return node->value; }
     pointer   operator->() const { return &(operator*()); }
     
+
+    // 寻找后继
+    // 若对最大元素++，node指向header_
     iterator& operator++()
-    {// 寻找后继
+    {
         if(node->right != nullptr)
             node = rb_tree_min(node->right);
         else
@@ -164,8 +167,6 @@ struct rb_tree_iterator : public deonSTL::iterator<deonSTL::bidirectional_iterat
             }
             if(node->right != p) // 只有一个根节点时，node已经指向header_
                 node = p;
-            // 若对最大元素++，node指向header_
-            // 若对空树++，node指向nullptr
         }
         return *this;
     }
@@ -175,8 +176,11 @@ struct rb_tree_iterator : public deonSTL::iterator<deonSTL::bidirectional_iterat
         ++this;
         return tmp;
     }
+    
+    // 寻找前驱
+    // 若对最小元素--，node指向header_
     iterator& operator--()
-    {// 寻找前驱
+    {
         if(node->left != nullptr)
             node = rb_tree_max(node->left);
         else
@@ -189,8 +193,6 @@ struct rb_tree_iterator : public deonSTL::iterator<deonSTL::bidirectional_iterat
             }
             if(node->left != p) // 只有一个根节点时，node已经指向header_
                 node = p;
-            // 若对最小元素--，node指向header_
-            // 若对空树--，node指向nullptr
         }
         return *this;
     }
@@ -667,7 +669,7 @@ public:
     { return leftmost(); }
     const_iterator  begin()    const noexcept
     { return leftmost(); }
-    iterator        end()            noexcept
+    iterator        end()            noexcept // end -> Max
     { return rightmost(); }
     const_iterator  end()      const noexcept
     { return rightmost(); }
@@ -689,7 +691,8 @@ public:
     { emplace_multi(std::move(value)); }
     
     iterator insert_unique(const value_type& value);
-    iterator insert_unique(value_type&& value);
+    iterator insert_unique(value_type&& value)
+    { return emplace_unique(std::move(value)); }
     
     // erase, clear
     iterator erase(iterator pos);
@@ -722,11 +725,27 @@ public:
     
     // equal_range
     deonSTL::pair<iterator, iterator>
-    equal_range_multi(const key_type& key);
+    equal_range_multi(const key_type& key)
+    { return deonSTL::pair<iterator, iterator>(lower_bound(key), upper_bound(key)); }
     deonSTL::pair<const_iterator, const_iterator>
-    equal_range_multi(const key_type& key) const;
+    equal_range_multi(const key_type& key) const
+    { return deonSTL::pair<const_iterator, const_iterator>(lower_bound(key), upper_bound(key)); }
     
     // equal_unique
+    deonSTL::pair<iterator, iterator>
+     equal_range_unique(const key_type& key)
+     {
+       iterator it = find(key);
+       auto next = it;
+       return it == end() ? deonSTL::make_pair(it, it) : deonSTL::make_pair(it, ++next);
+     }
+     deonSTL::pair<const_iterator, const_iterator>
+     equal_range_unique(const key_type& key) const
+     {
+       const_iterator it = find(key);
+       auto next = it;
+       return it == end() ? deonSTL::make_pair(it, it) : deonSTL::make_pair(it, ++next);
+     }
     
     //swap
     void swap(rb_tree& rhs) noexcept;
@@ -741,9 +760,8 @@ private:
     node_ptr clone_node(node_ptr x);
     void     destroy_node(node_ptr p);
     
-    // init, reset
+    // init
     void     rb_tree_init();
-    void     reset();
     
     // get insert pos
     deonSTL::pair<node_ptr, bool>
@@ -773,13 +791,14 @@ private:
 //                             member functions                              //
 //***************************************************************************//
 
+// 拷贝构造函数
 template <class T, class Compare>
 rb_tree<T, Compare>::rb_tree(const rb_tree& rhs)
 {
     rb_tree_init();
     if(rhs.node_count_ != 0)
     {
-        root() = copy_from(rhs.root(), rhs.header_);
+        root() = copy_from(rhs.root());
         leftmost() = rb_tree_min(root());
         rightmost() = rb_tree_max(root());
     }
@@ -787,15 +806,18 @@ rb_tree<T, Compare>::rb_tree(const rb_tree& rhs)
     key_comp_ = rhs.key_comp_;
 }
 
+// 移动构造函数
 template <class T, class Compare>
 rb_tree<T, Compare>::rb_tree(rb_tree&& rhs) noexcept
 :header_(std::move(rhs.header_)),
  node_count_(rhs.node_count_),
  key_comp_(rhs.key_comp_)
 {
-    rhs.reset();
+    rhs.header_ = nullptr;
+    rhs.node_count_ = 0;
 }
 
+// 拷贝赋值函数
 template <class T, class Compare>
 rb_tree<T, Compare>&
 rb_tree<T, Compare>::operator=(const rb_tree &rhs)
@@ -803,10 +825,9 @@ rb_tree<T, Compare>::operator=(const rb_tree &rhs)
     if(this != &rhs)
     {
         clear();
-        
         if(rhs.node_count_ != 0)
         {
-            root() = copy_from(rhs.root(), header_);
+            root() = copy_from(rhs.root());
             leftmost() = rb_tree_min(root());
             rightmost() = rb_tree_max(root());
         }
@@ -816,7 +837,7 @@ rb_tree<T, Compare>::operator=(const rb_tree &rhs)
     return *this;
 }
 
-
+// 移动赋值函数
 template <class T, class Compare>
 rb_tree<T, Compare>&
 rb_tree<T, Compare>::operator=(rb_tree &&rhs)
@@ -825,10 +846,12 @@ rb_tree<T, Compare>::operator=(rb_tree &&rhs)
     header_ = std::move(rhs.header_);
     node_count_ = rhs.node_count_;
     key_comp_ = rhs.key_comp_;
-    rhs.reset();
+    rhs.header_ = nullptr;
+    rhs.node_count_ = 0;
     return *this;
 }
 
+// emplace_multi 允许重复的插入，构造value，返回插入节点
 template <class T, class Compare>
 template <class ...Args>
 typename rb_tree<T, Compare>::iterator
@@ -839,6 +862,7 @@ rb_tree<T, Compare>::emplace_multi(Args&& ...args)
     return insert_node_at(res.first, node, res.second);
 }
 
+// emplace_unique 不允许重复的插入，构造value，返回 <插入节点，是否插入成功>
 template <class T, class Compare>
 template <class ...Args>
 typename deonSTL::pair<typename rb_tree<T, Compare>::iterator, bool>
@@ -852,6 +876,7 @@ rb_tree<T, Compare>::emplace_unique(Args&& ...args)
     return deonSTL::make_pair(iterator(res.first.first), false);
 }
 
+// insert_multi 允许重复的插入，传入value，返回插入节点
 template <class T, class Compare>
 typename rb_tree<T, Compare>::iterator
 rb_tree<T, Compare>::insert_multi(const value_type &value)
@@ -860,6 +885,7 @@ rb_tree<T, Compare>::insert_multi(const value_type &value)
     return insert_value_at(res.first, value, res.second);
 }
 
+// insert_unique 不允许重复的插入，传入value，返回 <插入节点，是否插入成功>
 template <class T, class Compare>
 typename rb_tree<T, Compare>::iterator
 rb_tree<T, Compare>::insert_unique(const value_type &value)
@@ -870,13 +896,13 @@ rb_tree<T, Compare>::insert_unique(const value_type &value)
     return deonSTL::make_pair(res.first.first, false);
 }
 
-// erase
+// erase 删除pos位置节点，返回被删除节点的后继
 template <class T, class Compare>
 typename rb_tree<T, Compare>::iterator
 rb_tree<T, Compare>::erase(iterator pos)
 {
-    node_ptr node = pos.node->get_node_ptr();
-    iterator next(node);
+    node_ptr node = pos.node;
+    iterator next(node); // 返回next
     ++next;
     
     rb_tree_erase_rebalance(pos.node, root(), leftmost(), rightmost());
@@ -889,7 +915,7 @@ rb_tree<T, Compare>::erase(iterator pos)
 
 // erase_unique
 
-// erase
+// erase 删除 [first, last) 区间内的元素
 template <class T, class Compare>
 void
 rb_tree<T, Compare>::erase(iterator first, iterator last)
@@ -904,6 +930,7 @@ rb_tree<T, Compare>::erase(iterator first, iterator last)
     }
 }
 
+// clear 清空
 template <class T, class Compare>
 void
 rb_tree<T, Compare>::clear()
@@ -915,6 +942,119 @@ rb_tree<T, Compare>::clear()
         root() = nullptr;
         rightmost() = header_;
         node_count_ = 0;
+    }
+}
+
+// find 查找key位置，若存在返回第一个位置，不存在返回nullptr
+template <class T, class Compare>
+typename rb_tree<T, Compare>::iterator
+rb_tree<T, Compare>::find(const key_type &key)
+{
+    node_ptr x = root();
+    while(x != nullptr && value_traits::get_key(x->value) != key)
+        x = key_comp_(value_traits::get_key(x->value), key) ? x->left : x->right;
+    return iterator(x);
+}
+
+// find 返回 const_iter
+template <class T, class Compare>
+typename rb_tree<T, Compare>::const_iterator
+rb_tree<T, Compare>::find(const key_type &key) const
+{
+    node_ptr x = root();
+    while(x != nullptr && value_traits::get_key(x->value) != key)
+        x = key_comp_(value_traits::get_key(x->value), key) ? x->left : x->right;
+    return const_iterator(x);
+}
+
+// lower_bound 键值大于等于key的第一个位置      待总结 ⚠️
+// 若key比最大值大则返回 header_
+template <class T, class Compare>
+typename rb_tree<T, Compare>::iterator
+rb_tree<T, Compare>::lower_bound(const key_type &key)
+{
+    auto p = header_;
+    auto x = root();
+    while(x != nullptr)
+    {
+        if(!key_comp_(value_traits::get_key(x->value), key))
+        {// key <= x
+            p = x; x = x->left;
+        }
+        else
+            x = x->right;
+    }
+    return iterator(p);
+}
+
+template <class T, class Compare>
+typename rb_tree<T, Compare>::const_iterator
+rb_tree<T, Compare>::lower_bound(const key_type &key) const
+{
+    auto p = header_;
+    auto x = root();
+    while(x != nullptr)
+    {
+        if(!key_comp_(value_traits::get_key(x->value), key))
+        {// key <= x
+            p = x; x = x->left;
+        }
+        else
+            x = x->right;
+    }
+    return const_iterator(p);
+}
+
+template <class T, class Compare>
+typename rb_tree<T, Compare>::iterator
+rb_tree<T, Compare>::upper_bound(const key_type &key)
+{
+    auto p = header_;
+    auto x = root();
+    while(x != nullptr)
+    {
+        if(key_comp_(key, value_traits::get_key(x->value)))
+        {// key < x
+            p = x; x = x->left;
+        }
+        else
+        {// key >= x
+            x = x->right;
+        }
+    }
+    return iterator(p);
+}
+
+template <class T, class Compare>
+typename rb_tree<T, Compare>::const_iterator
+rb_tree<T, Compare>::upper_bound(const key_type &key) const
+{
+    auto p = header_;
+    auto x = root();
+    while(x != nullptr)
+    {
+        if(key_comp_(key, value_traits::get_key(x->value)))
+        {// key < x
+            p = x; x = x->left;
+        }
+        else
+        {// key >= x
+            x = x->right;
+        }
+    }
+    return const_iterator(p);
+}
+
+// swap
+template <class T, class Compare>
+void
+rb_tree<T, Compare>::swap(rb_tree& rhs) noexcept
+{
+    if(this != &rhs)
+    {
+        std::swap(header_, rhs.header_);
+        std::swap(node_count_, rhs.node_count_);
+        std::swap(key_comp_, rhs.key_comp_);
     }
 }
 
@@ -984,14 +1124,6 @@ rb_tree<T, Compare>::rb_tree_init()
     node_count_ = 0;
 }
 
-// reset
-template <class T, class Compare>
-void
-rb_tree<T, Compare>::reset()
-{
-    header_     = nullptr;
-    node_count_ = 0;
-}
 
 // get_insert_multi_pos 返回（插入位置的父节点，是否插入在左），元素允许重复
 template <class T, class Compare>
@@ -1048,6 +1180,7 @@ rb_tree<T, Compare>::get_insert_unique_pos(const key_type &key)
 }
 
 // insert_value_at 把value插在x的左（add_at_left=true）或右孩子处，返回指向插入节点的迭代器
+// 本函数控制修改 lmost, rmost, node_count_
 template <class T, class Compare>
 typename rb_tree<T, Compare>::iterator
 rb_tree<T, Compare>::insert_value_at(node_ptr x, const value_type &value, bool add_at_left)
@@ -1078,6 +1211,7 @@ rb_tree<T, Compare>::insert_value_at(node_ptr x, const value_type &value, bool a
 }
 
 // insert_node_at 把 node 类型的 node 插入x的左(add_to_left=true) 或右，返回指向插入节点的迭代器
+// 本函数控制修改 lmost, rmost, node_count_
 template <class T, class Compare>
 typename rb_tree<T, Compare>::iterator
 rb_tree<T, Compare>::insert_node_at(node_ptr x, node_ptr node, bool add_at_left)
