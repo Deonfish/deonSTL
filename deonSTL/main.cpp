@@ -7,16 +7,32 @@
 //
 
 #include <iostream>
-#include "util.h"
+#include "rb_tree.h"
 #include <string>
+using namespace deonSTL;
 
+struct intCmp
+{
+    bool operator()(int a, int b){ return a < b; }
+};
 int main()
 {
-    std::string s1 = "hello", s2;
-    int a = 100, b = 200;
-    deonSTL::pair<int, std::string> pr(a, s1);
-    auto pr2 = deonSTL::make_pair(b, s1);
-    printf("%d %s\n", pr2.first, pr.second.c_str());
+    rb_tree<int,intCmp> T;
     
+    T.insert_unique(1);
+    T.insert_unique(2);
+    T.insert_unique(3);
+    T.insert_unique(4);
+    
+    auto it = T.begin();
+    for(; it != T.end(); ++it)
+        printf("%d\n", *it);
+    printf("%d\n", *it);
+    T.erase(it);
+    for(it = T.begin(); it != T.end(); ++it)
+        printf("%d\n", *it);
+    printf("%d\n", *it);
+    auto it2 = T.find(3);
+    printf("%d\n", *it2);
     return 0;
 }

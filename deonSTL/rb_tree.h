@@ -203,7 +203,7 @@ struct rb_tree_iterator : public deonSTL::iterator<deonSTL::bidirectional_iterat
         return tmp;
     }
     bool operator==(const rb_tree_iterator& rhs) { return node == rhs.node; }
-    bool operator!=(const rb_tree_iterator& rhs) { return !(this == rhs); }
+    bool operator!=(const rb_tree_iterator& rhs) { return !(*this == rhs); }
 };
 
 // rb_tree迭代器，const版本
@@ -284,7 +284,7 @@ struct rb_tree_const_iterator : public iterator<deonSTL::bidirectional_iterator_
         return tmp;
     }
     bool operator==(const rb_tree_const_iterator& rhs) { return node == rhs.node; }
-    bool operator!=(const rb_tree_const_iterator& rhs) { return !(this == rhs); }
+    bool operator!=(const rb_tree_const_iterator& rhs) { return !(*this == rhs); }
 };
 
 //***************************************************************************//
@@ -690,8 +690,8 @@ public:
     iterator insert_multi(value_type&& value)
     { emplace_multi(std::move(value)); }
     
-    iterator insert_unique(const value_type& value);
-    iterator insert_unique(value_type&& value)
+    deonSTL::pair<iterator, bool> insert_unique(const value_type& value);
+    deonSTL::pair<iterator, bool> insert_unique(value_type&& value)
     { return emplace_unique(std::move(value)); }
     
     // erase, clear
@@ -887,7 +887,7 @@ rb_tree<T, Compare>::insert_multi(const value_type &value)
 
 // insert_unique 不允许重复的插入，传入value，返回 <插入节点，是否插入成功>
 template <class T, class Compare>
-typename rb_tree<T, Compare>::iterator
+deonSTL::pair<typename rb_tree<T, Compare>::iterator, bool>
 rb_tree<T, Compare>::insert_unique(const value_type &value)
 {
     auto res = get_insert_unique_pos(value_traits::get_key(value));
@@ -905,7 +905,7 @@ rb_tree<T, Compare>::erase(iterator pos)
     iterator next(node); // 返回next
     ++next;
     
-    rb_tree_erase_rebalance(pos.node, root(), leftmost(), rightmost());
+    rb_tree_erase(pos.node, root(), leftmost(), rightmost());
     destroy_node(node);
     --node_count_;
     return next;

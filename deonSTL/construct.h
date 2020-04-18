@@ -56,7 +56,7 @@ void destroy_cat(ForwardIter first, ForwardIter last, std::false_type){
 
 template<class T>
 void destroy(T* ptr){
-    destroy_one(ptr, std::is_trivially_destructible<T>::value);
+    destroy_one(ptr, std::is_trivially_destructible<T>{});
 }
 
 template<class ForwardIter>
