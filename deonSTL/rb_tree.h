@@ -580,8 +580,9 @@ void rb_tree_erase_reballence(Nodeptr x, Nodeptr xp, Nodeptr& root)
         rb_tree_set_black(x);
 }
 
+// 删除，返回替代节点
 template <class NodePtr>
-void rb_tree_erase(NodePtr z, NodePtr& root, NodePtr& lmost, NodePtr& rmost)
+NodePtr rb_tree_erase(NodePtr z, NodePtr& root, NodePtr& lmost, NodePtr& rmost)
 {
     // y 指向z的子树后继节点或 z 节点
     auto y = (z->left == nullptr || z->right == nullptr) ? z : rb_tree_next(z);
@@ -591,17 +592,27 @@ void rb_tree_erase(NodePtr z, NodePtr& root, NodePtr& lmost, NodePtr& rmost)
     
     if(y != z)
     {// y 指向z的后继，x指向y的右节点（可能为空）
-        std::swap(y->value, z->value); // 要求 NodePtr 键值存在名为value的对象中
-        rb_tree_transplant(y, x, root, lmost, rmost);
+        if(y->parent != z){
+            rb_tree_transplant(y, x, root, lmost, rmost);
+            y->right = z->right;
+            y->right->parent = y;
+        }
+        rb_tree_transplant(z, y, root, lmost, rmost);
+        y->left = z->left;
+        y->left->parent = y;
+        y->color = z->color;
+        z = y;  // 由上层控制释放z的空间
     }
     else
     {// y 指向z，z右子树为空，x 指向 z的左子树（可能为空）
         rb_tree_transplant(z, x, root, lmost, rmost);
+        z = x;  // 由上层控制释放z的空间
     }
     // 此时 y指向被删除节点（已不在树中），x 指向替代节点
     // fix
     if(y->color == rb_tree_black)
         rb_tree_erase_reballence(x, xp, root);
+    return z;
 }
 
 
@@ -640,11 +651,12 @@ class rb_tree
     typedef rb_tree_const_iterator<T>                           const_iterator;
     
 private:
-    node_ptr    header_;        // 特殊节点，与跟节点互为对方的父节点，左、右分别指向树的最小值、最大值
+    node_ptr    header_;        // 特殊节点，标识各种不存在，与跟节点互为对方的父节点，左、右分别指向树的最小值、最大值
     size_type   node_count_;    // 节点数
     key_compare key_comp_;      // 比较准则
     
 private:
+    // 取得根节点，最大节点，最小节点
     node_ptr& root()        const { return header_->parent; }
     node_ptr& leftmost()    const { return header_->left; }
     node_ptr& rightmost()   const { return header_->right; }
@@ -665,14 +677,29 @@ public:
 public:
     // ==========================成员函数============================ //
     
+    //------------test helper---------------//
+    node_ptr        getRootNode()       noexcept
+    { return root(); }
+    
+    void            printIntTree(node_ptr node)
+    {
+        int left  = node->left  == nullptr ? -1 : node->left->value;
+        int right = node->right == nullptr ? -1 : node->right->value;
+        printf("node: %d, left: %d, right: %d\n", node->value, left, right);
+        if(left != -1)  printIntTree(node->left);
+        if(right != -1) printIntTree(node->right);
+    }
+    //------------test helper---------------//
+    
+    
     iterator        begin()          noexcept
     { return leftmost(); }
     const_iterator  begin()    const noexcept
     { return leftmost(); }
-    iterator        end()            noexcept // end -> Max
-    { return rightmost(); }
+    iterator        end()            noexcept
+    { return header_; }
     const_iterator  end()      const noexcept
-    { return rightmost(); }
+    { return header_; }
     
     bool            empty()    const noexcept { return node_count_ == 0; }
     size_type       size()     const noexcept { return node_count_; }
@@ -680,28 +707,36 @@ public:
     
     // emplcae
     template <class ...Args>
-    iterator emplace_multi(Args&& ...args);
+    iterator        emplace_multi(Args&& ...args);
     
     template <class ...Args>
     deonSTL::pair<iterator, bool> emplace_unique(Args&& ...args);
     
     // insert
-    iterator insert_multi(const value_type& value);
-    iterator insert_multi(value_type&& value)
+    iterator        insert_multi(const value_type& value);
+    iterator        insert_multi(value_type&& value)
     { emplace_multi(std::move(value)); }
     
     deonSTL::pair<iterator, bool> insert_unique(const value_type& value);
     deonSTL::pair<iterator, bool> insert_unique(value_type&& value)
     { return emplace_unique(std::move(value)); }
     
+    template <class InputIter>
+    void            insert_unique(InputIter first, InputIter last)
+    {
+        size_type n = deonSTL::distance(first, last);
+        for(; n > 0; --n, ++first)
+            insert_unique(*first);
+    }
+    
     // erase, clear
-    iterator erase(iterator pos);
-    iterator erase_multi(const key_type& key);
-    iterator erase_unique(const key_type& key);
+    iterator        erase(iterator pos);
+    size_type       erase_multi(const key_type& key);
+    size_type       erase_unique(const key_type& key);
     
-    void     erase(iterator first, iterator last);
+    void            erase(iterator first, iterator last);
     
-    void     clear();
+    void            clear();
     
     // find
     iterator       find(const key_type& key);
@@ -912,8 +947,30 @@ rb_tree<T, Compare>::erase(iterator pos)
 }
 
 // erase_multi
+template <class T, class Compare>
+typename rb_tree<T, Compare>::size_type
+rb_tree<T, Compare>::erase_multi(const key_type &key)
+{
+    auto p = equal_range_multi(key);
+    size_type n = deonSTL::distance(p.first, p.second);
+    erase(p.first, p.second);
+    return n;
+}
 
 // erase_unique
+template <class T, class Compare>
+typename rb_tree<T, Compare>::size_type
+rb_tree<T, Compare>::erase_unique(const key_type &key)
+{
+    auto it = find(key);
+    if(it != end())
+    {
+        erase(it);
+        return 1;
+    }
+    return 0;
+    
+}
 
 // erase 删除 [first, last) 区间内的元素
 template <class T, class Compare>
@@ -952,8 +1009,9 @@ rb_tree<T, Compare>::find(const key_type &key)
 {
     node_ptr x = root();
     while(x != nullptr && value_traits::get_key(x->value) != key)
-        x = key_comp_(value_traits::get_key(x->value), key) ? x->left : x->right;
-    return iterator(x);
+        //printf("%d\n", value_traits::get_key(x->value));
+        x = key_comp_(key, value_traits::get_key(x->value)) ? x->left : x->right;
+    return x == nullptr ? end() : iterator(x);
 }
 
 // find 返回 const_iter
@@ -964,10 +1022,10 @@ rb_tree<T, Compare>::find(const key_type &key) const
     node_ptr x = root();
     while(x != nullptr && value_traits::get_key(x->value) != key)
         x = key_comp_(value_traits::get_key(x->value), key) ? x->left : x->right;
-    return const_iterator(x);
+    return x == nullptr ? end() : const_iterator(x);
 }
 
-// lower_bound 键值大于等于key的第一个位置      待总结 ⚠️
+// lower_bound 键值大于等于key的第一个位置
 // 若key比最大值大则返回 header_
 template <class T, class Compare>
 typename rb_tree<T, Compare>::iterator
@@ -1348,7 +1406,7 @@ rb_tree<T, Compare>::erase_since(node_ptr x)
 //***************************************************************************//
 
 
-
+ 
 } // namespace deonSTL
 
 #endif /* rb_tree_h */

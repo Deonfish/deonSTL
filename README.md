@@ -2,23 +2,51 @@
 
 自己实现的STL，since c++11
 
-| 组件          |            |
-| ------------- | ---------- |
-| allocater     | ✅          |
-| constructor   | ✅          |
-| iterator      | ✅          |
-| type_traits   | ✅          |
-| uninitialized | ✅          |
-| util          | pair待实现 |
+| 组件          |      |
+| ------------- | ---- |
+| allocater     | ✅    |
+| constructor   | ✅    |
+| iterator      | ✅    |
+| type_traits   | ✅    |
+| uninitialized | ✅    |
+| util          | ✅    |
 
 | 容器    |      |
 | ------- | ---- |
 | vector  | ✅    |
 | deque   | ✅    |
 | stack   | ✅    |
-| rb_tree | 🔧    |
+| rb_tree | ✅    |
 | set     |      |
 | map     |      |
+
+### vector
+
+| vector                                                       |
+| ------------------------------------------------------------ |
+| emplace(poa, ...args)<br />emplace_back(...args)             |
+| push_back(value)<br />pop_back()                             |
+| insert(pos, value)<br />insert(pos, n, value)<br />insert(pos, first, last) |
+| erase(pos)<br />erase(fitst, last)                           |
+| resize(new_size, value)                                      |
+
+
+
+### deque
+
+| deque_iter |
+| ---------- |
+|            |
+|            |
+|            |
+
+| deque |
+| ----- |
+|       |
+|       |
+|       |
+
+
 
 ### rb_tree
 
