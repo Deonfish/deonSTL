@@ -25,6 +25,7 @@
 /* Begin PBXFileReference section */
 		07006BB424489F0D00A185CF /* rb_tree_test.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rb_tree_test.h; sourceTree = "<group>"; };
 		071A7E30244C32EB0049ECAB /* set.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = set.h; sourceTree = "<group>"; };
+		071A7E31244C86150049ECAB /* map.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = map.h; sourceTree = "<group>"; };
 		071DEFD72425EBC800E6B9C3 /* exceptdef.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = exceptdef.h; sourceTree = "<group>"; };
 		071DEFD8242B672500E6B9C3 /* deque.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = deque.h; sourceTree = "<group>"; };
 		071DEFD924348EC900E6B9C3 /* stack.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = stack.h; sourceTree = "<group>"; };
@@ -84,6 +85,7 @@
 				071DEFDA2438277900E6B9C3 /* rb_tree.h */,
 				071DEFDB243984AE00E6B9C3 /* util.h */,
 				071A7E30244C32EB0049ECAB /* set.h */,
+				071A7E31244C86150049ECAB /* map.h */,
 			);
 			path = deonSTL;
 			sourceTree = "<group>";
