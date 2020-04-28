@@ -7,12 +7,10 @@
 //
 
 #include <iostream>
-#include "rb_tree.h"
-#include <vector>
-#include <string>
-#include "map.h"
-using namespace deonSTL;
+#include "hashtable.h"
+using namespace std;
 
+/*
 struct intCmp
 {
     bool operator()(int a, int b){ return a < b; }
@@ -57,5 +55,21 @@ int main()
     it = T.find(100);
     if(it != T.end()) printf("find %d\n", *it);
     
+    return 0;
+}
+ */
+
+class Foo{
+public:
+    Foo() = default;
+    explicit Foo(const Foo& rhs);
+};
+
+void func(Foo x);
+
+int main()
+{
+    const Foo cf;
+    //func(cf);
     return 0;
 }
