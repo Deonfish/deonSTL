@@ -2,6 +2,9 @@
 //  iterator.h
 //  deonSTL
 //
+//  这个头文件用于迭代器设计，包含了迭代器类型标签，迭代器模板(基类)，迭代器萃取器
+//  还包含算法 distance 和 advance
+//
 //  Created by 郭松楠 on 2020/3/14.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

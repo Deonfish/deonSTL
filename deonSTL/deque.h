@@ -2,6 +2,10 @@
 //  deque.h
 //  deonSTL
 //
+//  这个头文件包含了一个模板类 deque 和 迭代器 deque_iter
+//  deque: 双端队列
+//  deque_iter: 随机访问迭代器
+//
 //  Created by 郭松楠 on 2020/3/25.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

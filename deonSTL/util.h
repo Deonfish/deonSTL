@@ -2,6 +2,8 @@
 //  util.h
 //  deonSTL
 //
+//  这个头文件包含pair
+//
 //  Created by 郭松楠 on 2020/4/5.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //
@@ -125,6 +127,12 @@ pair<T1, T2> make_pair(T1&& first, T2&& second)
 {
     return pair<T1, T2>(std::forward<T1>(first), std::forward<T2>(second));
 }
+
+template <class T>
+struct is_pair : std::false_type {};
+
+template <class T1, class T2>
+struct is_pair<deonSTL::pair<T1, T2>> : std::true_type {};
 
 
 

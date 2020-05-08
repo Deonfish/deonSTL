@@ -2,6 +2,8 @@
 //  stack.h
 //  deonSTL
 //
+// 这个头文件包含了一个模板类 stack
+//
 //  Created by 郭松楠 on 2020/4/1.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

@@ -2,6 +2,8 @@
 //  map.h
 //  deonSTL
 //
+//  这个头文件包含模板类 map
+//
 //  Created by 郭松楠 on 2020/4/19.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

@@ -2,6 +2,9 @@
 //  rb_tree.h
 //  deonSTL
 //
+// 这个头文件包含一个模板类 rb_tree，迭代器 iter，红黑树上算法
+// iter: 双向迭代器
+//
 //  Created by 郭松楠 on 2020/4/4.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

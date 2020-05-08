@@ -2,6 +2,9 @@
 //  vector.h
 //  deonSTL
 //
+//  这个头文件包含模板类 vector
+//  指针做为迭代器
+//
 //  Created by 郭松楠 on 2020/3/5.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

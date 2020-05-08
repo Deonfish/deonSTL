@@ -2,6 +2,10 @@
 //  construct.h
 //  deonSTL
 //
+//  这个头文件包含两个函数 construct，destroy
+//  construct : 负责在已申请的未构造内存上构造对象
+//  destroy   : 负责对象的析构
+//
 //  Created by 郭松楠 on 2020/3/8.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //
@@ -26,7 +30,7 @@ void construct(T* ptr, const T& value){
     ::new(ptr) T(value);
 }
 
-template <class T, class... Args>   //🔥具体行为？
+template <class T, class... Args>
 void construct(T* ptr, Args&&... args){
     ::new(ptr) T(std::forward<Args>(args)...);
 }

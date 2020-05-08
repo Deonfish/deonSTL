@@ -2,6 +2,8 @@
 //  uninitialized.h
 //  deonSTL
 //
+//  这个头文件用于对未初始化空间批量构造元素
+//
 //  Created by 郭松楠 on 2020/3/14.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

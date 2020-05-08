@@ -2,6 +2,8 @@
 //  numeric.h
 //  deonSTL
 //
+//  这个头文件用于数值计算，包含一些数值计算函数
+//
 //  Created by 郭松楠 on 2020/5/8.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //

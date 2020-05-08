@@ -1,7 +1,9 @@
 //
 //  allocator.h
 //  deonSTL
-
+//
+//  这个头文件包含一个模板类 allocator，用于管理内存的分配、释放，对象的构造、析构
+//
 //  Created by 郭松楠 on 2020/3/5.
 //  Copyright © 2020 郭松楠. All rights reserved.
 //
