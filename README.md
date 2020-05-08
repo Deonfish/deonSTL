@@ -6,6 +6,15 @@
 
 ## 进度
 
+<style>
+table th:first-of-type {
+    width: 50%;
+}
+table th:nth-of-type(2) {
+    width: 50%;
+}
+</style>
+
 | 目标        | 进度 |
 | ----------- | ---- |
 | allocator   | 100% |
