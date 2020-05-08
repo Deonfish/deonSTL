@@ -7,7 +7,10 @@
 //
 
 #include <iostream>
+#include <vector>
 #include "hashtable.h"
+#include "algorithm.h"
+#include <algorithm>
 using namespace std;
 
 /*
@@ -59,17 +62,15 @@ int main()
 }
  */
 
-class Foo{
-public:
-    Foo() = default;
-    explicit Foo(const Foo& rhs);
-};
-
-void func(Foo x);
+int b_func(int a, int b){
+    return a+b;
+}
 
 int main()
 {
-    const Foo cf;
-    //func(cf);
+    vector<int> vec(10); int i = 0;
+    for(auto &x : vec) x = ++i;
+    int res = deonSTL::accumulate(vec.begin(), vec.end(), 0, b_func);
+    cout << res << endl;
     return 0;
 }

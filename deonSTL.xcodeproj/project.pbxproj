@@ -32,6 +32,9 @@
 		071DEFDA2438277900E6B9C3 /* rb_tree.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rb_tree.h; sourceTree = "<group>"; };
 		071DEFDB243984AE00E6B9C3 /* util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = util.h; sourceTree = "<group>"; };
 		072A049C245531EE00F17E11 /* hashtable.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = hashtable.h; sourceTree = "<group>"; };
+		074EC09624653FE6008090F7 /* numeric.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = numeric.h; sourceTree = "<group>"; };
+		074EC097246546FA008090F7 /* algorithm.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = algorithm.h; sourceTree = "<group>"; };
+		074EC09824654B39008090F7 /* algobase.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = algobase.h; sourceTree = "<group>"; };
 		079CE1432411148C00733E84 /* deonSTL */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = deonSTL; sourceTree = BUILT_PRODUCTS_DIR; };
 		079CE1462411148C00733E84 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		079CE150241115E000733E84 /* vector.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = vector.h; sourceTree = "<group>"; };
@@ -88,6 +91,9 @@
 				071A7E30244C32EB0049ECAB /* set.h */,
 				071A7E31244C86150049ECAB /* map.h */,
 				072A049C245531EE00F17E11 /* hashtable.h */,
+				074EC09624653FE6008090F7 /* numeric.h */,
+				074EC097246546FA008090F7 /* algorithm.h */,
+				074EC09824654B39008090F7 /* algobase.h */,
 			);
 			path = deonSTL;
 			sourceTree = "<group>";
